@@ -18,16 +18,16 @@ def youden_separation_score(emb_a, emb_b):
     By running a threshold from one end of the line to the other end, we compute the true positive rate and false positive rate.
     The Youden index is given by maximum absolute difference between the true positive rate - false positive rate.
    
-    Params
-    ------
-    emb_a: numpy.array, shape=(num_point, dim)
+    Parameters
+    ----------
+    emb_a : numpy.array, shape=(num_point, dim)
         Embedding vectors for class a.
-    emb_a: numpy.array, shape=(num_point, dim)
+    emb_b : numpy.array, shape=(num_point, dim)
         Embedding vectors for class b.
    
-    Return
-    ------
-    score: float
+    Returns
+    -------
+    score : float
         Youden index
     """
 
@@ -63,27 +63,27 @@ def calc_pairwise_separation_score(
     """
     Calculate the separation score for each pair of groups of vectors.
    
-    Params
-    ------
-    emb: numpy.array, shape=(num_point, dim)
+    Parameters
+    ----------
+    emb : numpy.array, shape=(num_point, dim)
         embedding vector
-    groups: numpy.array, shape=(num_point,)
+    groups : numpy.array, shape=(num_point,)
         group membership for points. Can be integer or string
         calc_separation_score
-    separation_score_func: function
+    separation_score_func : function
         Function to compute the separation score. This function takes two arguments, emb_a and emb_b, and
         compute the separation level for the two vectors.
-    is_symmetric: bool (Optional; Default True)
+    is_symmetric : bool (Optional; Default True)
         Set True if the separation score is symmetric with respect to the groups, i.e., the score does not change
         when we swap the class labels.
-    n_jobs: int (Optional; Default 20)
+    n_jobs : int (Optional; Default 20)
         Number of cores
        
     Returns
     -------
-    separation_matrix: numpy.array, shape=(num_groups, num_groups)
+    separation_matrix : numpy.array, shape=(num_groups, num_groups)
         separation_matrix[i,j] indicates the sepration level of group_labels[i] and group_labels[j].
-    group_labels: numpy.array
+    group_labels : numpy.array
         List of groups.
     """
     group_labels = np.unique(groups)
