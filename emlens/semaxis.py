@@ -103,7 +103,15 @@ def calcSemAxis(
         return ret_vec
 
 
-def fisher_linear_discriminant(vec, class_vec, class_labels, dim, priors = "data", shrinkage = 0, return_class_vec = False):
+def fisher_linear_discriminant(
+    vec,
+    class_vec,
+    class_labels,
+    dim,
+    priors="data",
+    shrinkage=0,
+    return_class_vec=False,
+):
     """
     Fisher's linear discriminant analysis. 
 
@@ -140,7 +148,7 @@ def fisher_linear_discriminant(vec, class_vec, class_labels, dim, priors = "data
     """
 
     labels, group_ids = np.unique(class_labels, return_inverse=True)
-    
+
     K = len(labels)
     DIM = vec.shape[1]
 
@@ -154,7 +162,7 @@ def fisher_linear_discriminant(vec, class_vec, class_labels, dim, priors = "data
     elif priors == "uniform":
         for k, lab in enumerate(labels):
             class_weight[k] = 1
-    
+
     class_weight = class_weight / np.sum(class_weight)
 
     Cw = np.zeros((DIM, DIM))  # Within-class variance
@@ -164,15 +172,15 @@ def fisher_linear_discriminant(vec, class_vec, class_labels, dim, priors = "data
         mu_k = np.mean(v_k, axis=0)
         MU[k, :] = mu_k
 
-        Cw += class_weight[k] * np.cov(v_k.T) 
+        Cw += class_weight[k] * np.cov(v_k.T)
 
     Cb = np.zeros((DIM, DIM))  # Between-class
-    mu = np.mean(MU, axis = 0)
+    mu = np.mean(MU, axis=0)
     for k in range(K):
         Cb += class_weight[k] * np.outer(MU[k, :] - mu, MU[k, :] - mu)
 
-    if (shrinkage <1) and (shrinkage >0):
-        Cw = Cw + shrinkage / (1-shrinkage) * np.eye(DIM)
+    if (shrinkage < 1) and (shrinkage > 0):
+        Cw = Cw + shrinkage / (1 - shrinkage) * np.eye(DIM)
     elif shrinkage == 1:
         Cw = np.eye(DIM)
 
