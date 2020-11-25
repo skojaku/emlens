@@ -2,6 +2,9 @@ import numpy as np
 import scipy
 from scipy import sparse
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+import os
+import json
+import shutil
 
 
 def calcSemAxis(
@@ -197,7 +200,7 @@ def fisher_linear_discriminant(
         return prj_vec
 
 
-def saveSemAxis(filename, class_vec, labels):
+def saveSemAxis(filename, class_vec, labels, **kwargs):
     """
     Save SemAxis into a file
 
@@ -210,7 +213,15 @@ def saveSemAxis(filename, class_vec, labels):
     labels : np.array
         Labels for the class_vec.
     """
-    np.savez(filename, class_vec=class_vec, labels=labels)
+    if os.path.exists(filename):
+        shutil.rmtree(filename)
+    os.mkdir(filename)
+    emb_filename = "{dir_name}/vec.npz".format(dir_name = filename)
+    param_filename = "{dir_name}/param.json".format(dir_name = filename)
+    
+    np.savez(emb_filename, class_vec=class_vec, labels=labels)
+    with open(param_filename, "w") as f:
+        json.dump(kwargs, f)
 
 
 def calcSemAxis_from_file(filename, vec, **params):
@@ -229,7 +240,17 @@ def calcSemAxis_from_file(filename, vec, **params):
     -------
     return : return from calcSemAxis
     """
-    data = np.load(filename, allow_pickle=True)
+    emb_filename = "{dir_name}/vec.npz".format(dir_name = filename)
+    param_filename = "{dir_name}/param.json".format(dir_name = filename)
+
+    data = np.load(emb_filename, allow_pickle=True)
     class_vec = data["class_vec"]
     labels = data["labels"]
-    return calcSemAxis(vec, class_vec, labels, **params)
+    
+    with open(param_filename, "r") as f:
+        saved_params = json.load(f)
+   
+    if isinstance(params, dict):
+        for k, v in params.items():
+            saved_params[k] = v
+    return calcSemAxis(vec, class_vec, labels, **saved_params)
