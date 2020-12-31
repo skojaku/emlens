@@ -13,7 +13,7 @@ def calcSemAxis(
     labels,
     label_order=None,
     dim=1,
-    mode="semaxis",
+    mode="fda",
     centering=True,
     return_class_vec=False,
     **params
@@ -169,27 +169,44 @@ def fisher_linear_discriminant(
     class_weight = class_weight / np.sum(class_weight)
 
     Cw = np.zeros((DIM, DIM))  # Within-class variance
-    MU = np.zeros((K, DIM))  # Between-class
+    MU = np.zeros((K, DIM))  # Mean for each class 
     for k in range(K):
         v_k = class_vec[group_ids == k, :]
         mu_k = np.mean(v_k, axis=0)
         MU[k, :] = mu_k
 
+        if v_k.shape[0] == 1:
+            continue
+
         Cw += class_weight[k] * np.cov(v_k.T)
 
-    Cb = np.zeros((DIM, DIM))  # Between-class
-    mu = np.mean(MU, axis=0)
-    for k in range(K):
-        Cb += class_weight[k] * np.outer(MU[k, :] - mu, MU[k, :] - mu)
 
+    # Shrinkage
     if (shrinkage < 1) and (shrinkage > 0):
         Cw = Cw + shrinkage / (1 - shrinkage) * np.eye(DIM)
     elif shrinkage == 1:
         Cw = np.eye(DIM)
 
-    # Solve generalized eigenvalue problem
-    s, u, _ = scipy.linalg.eig(Cb, Cw, left=True)
-    u = u[:, np.argsort(-np.array(s).reshape(-1))[:dim]]
+    # between class 
+    if K == 2:
+        u = np.linalg.inv(Cw) @ (MU[1,:] - MU[0,:]).reshape((DIM, 1))
+        u = u / np.linalg.norm(u)
+    else:
+        Cb = np.zeros((DIM, DIM))  # Between-class
+        mu = np.mean(MU, axis=0)
+        for k in range(K):
+            Cb += class_weight[k] * np.outer(MU[k, :] - mu, MU[k, :] - mu)
+    
+        if (shrinkage < 1) and (shrinkage > 0):
+            Cw = Cw + shrinkage / (1 - shrinkage) * np.eye(DIM)
+        elif shrinkage == 1:
+            Cw = np.eye(DIM)
+   
+        # Solve generalized eigenvalue problem
+        s, u, _ = scipy.linalg.eig(Cb, Cw, left=True)
+        ids = np.argsort(-np.array(s).reshape(-1))[:dim]
+        u = u[:, ids] #@ np.diag(np.sqrt(np.real(s[ids])))
+    
 
     # Projection
     prj_vec = vec @ u
