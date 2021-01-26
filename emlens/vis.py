@@ -21,29 +21,26 @@ def repel_labels(
     """Add text labels to the points. The position of text will be
     automatically adjusted to avoid overlap.
 
-    Parameters
-    ----------
-    ax : matplotlib axis
-    x : numpy.array
-    y : numpy.array
-    labels : list of str
-        Text labels.
-    color : str (Optional; Default "#4d4d4d")
-        Hex code for the color of lines
-    label_width : int (Optional; Default 30)
-        Maximum length of labels. If the text exceeds this length,
-        it is automatically folded
-    arrow_shring : int (Optional; Default 5)
-        Determine the margin betwen point and dashed line.
-        This parameter is passed to `arrowprops` of `adjust_text`
-    text_param : dict (Optional; Default {})
-        parametrs that are passed to `ax.text`
-    adjust_text_params : dict (Optional; Default {})
-        parametrs that are passed to `adjust_text``
-
-    Returns
-    ------
-    ax : matplotlib ax
+    :param ax: matplotlib axis
+    :type ax: matplotlib.axis
+    :param x: x coordinate
+    :type x: numpy.array
+    :param y: y coordinate
+    :type y: numpy.array
+    :param labels: Maximum length of labels. If the text exceeds this length, it is automatically folded
+    :type labels: numpy.ndarry
+    :param color: color of font, defaults to "#4d4d4d"
+    :type color: str, optional
+    :param label_width: label maximum width, defaults to 30
+    :type label_width: int, optional
+    :param arrow_shrink: size of arrow, defaults to 5
+    :type arrow_shrink: int, optional
+    :param text_params: parameter for ax.text, defaults to {}
+    :type text_params: dict, optional
+    :param adjust_text_params: parameter for adjust_text, defaults to {}
+    :type adjust_text_params: dict, optional
+    :return: matplotlib axis
+    :rtype: matplotlib.ax
     """
     txt_list = []
     for i, label in enumerate(labels):

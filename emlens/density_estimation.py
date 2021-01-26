@@ -8,22 +8,16 @@ def estimate_pdf(locations, emb, kernel="epanechnikov", dh=None, n_jobs=30):
     """Estimate the density of points at given locations in embedding space. A
     kernel density estimation is used to compute the density.
 
-    Parameters
-    ----------
-    locations : numpy.array, shape=(num_locations, dim)
-        Location at which the density is calculated.
-    emb : numpy.array, shape=(num_point, dim)
-        Embedding vectors of points.
-    kernel : str (Optional; Default "epanechnikov")
-        Type of kernel function used to estimate density.
-        See https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KernelDensity.html#sklearn.neighbors.KernelDensity.
-    n_jobs : int (Optional; Default 30)
-        Number of cores.
-
-    Returns
-    -------
-    prob_density : numpy.array (num_locations,)
-        Density of points given by `emb` at `locations`.
+    :params: locations: Location at which the density is calculated.
+    :type locations: numpy.array, shape=(num_locations, dim)
+    :params emb: Embedding vectors of points
+    :type emb: numpy.ndarray, (num_point, dim)
+    :params kernel: type of kernel, See https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KernelDensity.html#sklearn.neighbors.KernelDensity., defaults to "epanechnikov"
+    :type kernel: str, optional
+    :params n_jobs: Number of cores., defaults to 30
+    :type n_jobs: int, optional
+    :return: Density of points given by `emb` at `locations`.
+    :rtype: numpy.ndarray (num_locations,)
     """
     if dh is None:
         dh = np.power(

@@ -10,6 +10,15 @@ from .semaxis import calcSemAxis
 
 
 def make_knn_graph(X, k=5):
+    """Construct the kNN graph.
+
+    :param X: embedding vectors
+    :type X: numpy.ndarray (num_entities, dim)
+    :param k: Number of neighbors, defaults to 5
+    :type k: int, optional
+    :return: KNN graph
+    :rtype: sparse.csr_matrix
+    """
     index = faiss.IndexFlatL2(X.shape[1])
     index.add(X.astype(np.float32))
     distances, indices = index.search(X.astype(np.float32), k=k)
@@ -24,26 +33,22 @@ def make_knn_graph(X, k=5):
 
 
 def calc_assortativity(emb, y, label_type="cont", A=None, k=5):
-    """Calculate the assortativity for a KNN graph constructed based on the
-    embedding.
+    """Calculate the assortativity for a KNN graph constructed based on the.
 
-    Params
-    ------
-    emb: numpy.ndarray (num_entities, dim)
-    y: labels for each entity
-    label_type: type of the label. label_type="cont" if y is continuous. label = "disc" if y is discrete (i.e., groups labels).
-    A: scipy.sparse matrix (Optional; Default None). If given, use this graph instead of constructing the KNN from the scratch.
-    k: # of neighbors
-
-    Returns
-    -------
-    corr: Assortativity of the KNN graph
-
-    Example
-    -------
-    >>> indeg = np.array(net.sum(axis = 0)).reshape(-1)
-    >>> calc_assortativity(emb, indeg)
+    :param emb: embedding vectors
+    :type emb: numpy.ndarray (num_entities, dim)
+    :param y: labels for entities
+    :type y: nuimpy.ndarray or list
+    :param label_type: type of labels, defaults to "cont"
+    :type label_type: str, optional
+    :param A: precomputed graph, defaults to None
+    :type A: scipy.csr_matrix, optional
+    :param k: Number of neighbors, defaults to 5
+    :type k: int, optional
+    :return: assortativity index
+    :rtype: sparse.csr_matrix
     """
+
     if A is None:
         A = make_knn_graph(emb, k=k)
     r, c, v = sparse.find(A)
@@ -63,6 +68,17 @@ def calc_assortativity(emb, y, label_type="cont", A=None, k=5):
 
 
 def calc_pairwise_dot_sim(X, y):
+    """Pairwise dot similarity between groups. The dot similarity between two
+    groups is computed by averaging over the dot similarity between entities in
+    the groups.
+
+    :param X: embedding
+    :type X: numpy.ndarray
+    :param y: group index
+    :type y: numpy.ndarray or list
+    :return: Similarity matrix S, and labels for groups
+    :rtype: numpy.ndarray, numpy.ndarray
+    """
     labels, yids = np.unique(y, return_inverse=True)
 
     U = sparse.csr_matrix(
@@ -76,13 +92,17 @@ def calc_pairwise_dot_sim(X, y):
     return S, labels
 
 
-def calc_cluster_separativity(emb):
-    ypred = emb.reshape(-1)
-    y = np.eye(emb.shape[0]).reshape(-1)
-    return average_precision_score(y, ypred)
-
-
 def calc_pairwise_distance(X, y):
+    """Pairwise distance between groups. The distance between two groups is the
+    distance between the centroid of the groups.
+
+    :param X: embedding
+    :type X: numpy.ndarray
+    :param y: group index
+    :type y: numpy.ndarray or list
+    :return: Distance matrix D, and labels for groups
+    :rtype: numpy.ndarray, numpy.ndarray
+    """
     labels, yids = np.unique(y, return_inverse=True)
     U = sparse.csr_matrix(
         (np.ones_like(yids), (np.arange(yids.size), yids)),

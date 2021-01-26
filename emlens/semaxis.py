@@ -19,43 +19,34 @@ def calcSemAxis(
     return_class_vec=False,
     **params
 ):
-    """Find SemAxis.
+    """[summary]
 
-    Parameters
-    ----------
-    vec : np.array, shape=(num_data, num_dim)
-        Embedding vector for data points.
-    class_vec : np.array, shape=(num_data, num_dim)
-        Embedding vector for data with class labels.
-    labels : list, np.array
-        class labels associated with class_vec. labels[i] indicates the label for a point embedded at class_vec[i,:]
-    label_order : list (Optional;Default None)
-        Order of labels. Only affect the rotation of the space.
-    dim : int (Optional;Default 1)
-        The dimension of space onto which the data points are projected.
-        For example, set dim=1 to get an axis. Setting dim=2 will generate 2d space.
-        If mode='semaxis', dim is automatically set to 1.
-    mode : 'semaxis', 'lda', or 'fda' (Optional; Default 'semaxis')
-        If mode='semaxis', an axis is computed based on [1]. If mode='lda', data are projected using lda. If mode='fda', Fisher discriminant analysis.
-        fda is often a better choice over 'lda' since lda assumes that each class has the same covariance while fda does not.
-    centering : bool (Optiona; Default True)
-        If True, centerize the projected data points.
-    return_class_vec : bool (Optional; Default False)
-        If return_class_vec=True, return the projection of the embedding vector with class labels.
-    **params : parameters
-        Parameters for sklean.discriminant_analysis.LinearDiscriminantAnalysis
-
-
-    Returns
-    -------
-    retvec : np.array, shape=(num_data, dim)
-        The vectors for the data points projected onto semaxis (or semspace).
-    class_vec : np.array, shape=(num_data_with_labels, dim) (Optional)
-        The projection of vectors used to construct the axis (or space).
-        This variable is returned only when return_class_vec=True.
-    labels : np.array, shape=(num_data_with_labels,) (Optional)
-        The class labels for vectors used to construct the axis (or space).
-        This variable is returned only when return_class_vec=True.
+    :param vec: embedding vectors
+    :type vec: numpy.ndarray (num_entities, dim)
+    :param class_vec: labeled vectors
+    :type class_vec: numpy.ndarray (num_labeled_entities, dim)
+    :param labels: labels
+    :type labels: numpy.ndarray(num_labeled_entities, dim)
+    :param label_order: label order, defaults to None
+    :type label_order: list, optional
+    :param dim: reduced dimension, defaults to 1
+    :type dim: int, optional
+    :param mode: projection method. mode="semaxis", "lda", "fda" are supported, defaults to "fda"
+    :type mode: str, optional
+    :param centering: center the projected space, defaults to True
+    :type centering: bool, optional
+    :param return_class_vec: whether to return the projected labeled vector, defaults to False
+    :type return_class_vec: bool, optional
+    :return: tuple containing
+        retvec : np.array, shape=(num_data, dim)
+            The vectors for the data points projected onto semaxis (or semspace).
+        class_vec : np.array, shape=(num_data_with_labels, dim) (Optional)
+            The projection of vectors used to construct the axis (or space).
+            This variable is returned only when return_class_vec=True.
+        labels : np.array, shape=(num_data_with_labels,) (Optional)
+            The class labels for vectors used to construct the axis (or space).
+            This variable is returned only when return_class_vec=True.
+    :rtype: tuple
     """
 
     def calc_mean_vec(vec, s=None):
@@ -117,36 +108,30 @@ def fisher_linear_discriminant(
 ):
     """Fisher's linear discriminant analysis.
 
-    Parameters
-    ----------
-    vec : np.array, shape=(num_data, num_dim)
-        Embedding vector for data points.
-    class_vec : np.array, shape=(num_data, num_dim)
-        Embedding vector for data with class labels.
-    class_labels : list, np.array
-        class labels associated with class_vec. labels[i] indicates the label for a point embedded at class_vec[i,:]
-    dim : int (Optional; Default 1)
-        The dimension of space onto which the data points are projected.
-        For example, set dim=1 to get an axis. Setting dim=2 will generate 2d space.
-        If mode='semaxis', dim is automatically set to 1.
-    shrinkage : float (Optional; Default 0)
-        A shrinkage parameter that controls the level of fitting of model. Useful when dimension is close to the number of data points.
-    priors : str (Optional; 'data', 'uniform', dict)
-        A prior distribution for the classes. priors='data' weight each class based on the number of data points. with priors='uniform', each
-        class will be treated equally. One can manually set a prior by passing a dict object taking keys as the class label and values as the (positive) weight.
-    return_class_vec : bool (Optional; Default False)
-        If return_class_vec=True, return the projection of the embedding vector with class labels.
-
-    Returns
-    -------
-    retvec : np.array, shape=(num_data, dim)
-        The vectors for the data points projected onto semaxis (or semspace).
-    class_vec : np.array, shape=(num_data_with_labels, dim) (Optional)
-        The projection of vectors used to construct the axis (or space).
-        This variable is returned only when return_class_vec=True.
-    labels : np.array, shape=(num_data_with_labels,) (Optional)
-        The class labels for vectors used to construct the axis (or space).
-        This variable is returned only when return_class_vec=True.
+    :param vec: embedding vectors
+    :type vec: numpy.ndarray (num_entities, dim)
+    :param class_vec: labeled vectors
+    :type class_vec: numpy.ndarray (num_labeled_entities, dim)
+    :param class_labels: labels
+    :type class_labels: numpy.ndarray(num_labeled_entities, dim)
+    :param dim: dimension
+    :type dim: int
+    :param priors: prior distribution for data, defaults to "data"
+    :type priors: str, optional
+    :param shrinkage: shrinkage strength, defaults to 0
+    :type shrinkage: int, optional
+    :param return_class_vec: whether to return the projected labeled entities, defaults to False
+    :type return_class_vec: bool, optional
+    :return: tuple containing
+    :rtype: tuple
+        retvec : np.array, shape=(num_data, dim)
+            The vectors for the data points projected onto semaxis (or semspace).
+        class_vec : np.array, shape=(num_data_with_labels, dim) (Optional)
+            The projection of vectors used to construct the axis (or space).
+            This variable is returned only when return_class_vec=True.
+        labels : np.array, shape=(num_data_with_labels,) (Optional)
+            The class labels for vectors used to construct the axis (or space).
+            This variable is returned only when return_class_vec=True.
     """
 
     labels, group_ids = np.unique(class_labels, return_inverse=True)
@@ -217,15 +202,14 @@ def fisher_linear_discriminant(
 def saveSemAxis(filename, class_vec, labels, **kwargs):
     """Save SemAxis into a file.
 
-    Parameters
-    ----------
-    filename : str
-        File name
-    class_vec : (num_data, num_dim)
-        Embedding vectors with class labels
-    labels : np.array
-        Labels for the class_vec.
+    :param filename: name of file
+    :type filename: str
+    :param class_vec: embedding vectors for labeled entities
+    :type class_vec: numpy.ndarray
+    :param labels: labels
+    :type labels: numpy.ndarray
     """
+
     if os.path.exists(filename):
         shutil.rmtree(filename)
     os.mkdir(filename)
@@ -240,17 +224,12 @@ def saveSemAxis(filename, class_vec, labels, **kwargs):
 def calcSemAxis_from_file(filename, vec, **params):
     """Calculate SemAxis from file.
 
-    Parameters
-    ----------
-    filename : str
-        File name
-    vec : (num_data, num_dim)
-        Embedding vectors
-    **params : all parameters will be passed to calcSemAxis
-
-    Returns
-    -------
-    return : return from calcSemAxis
+    :param filename: filename
+    :type filename: str
+    :param vec: Embedding vectors
+    :type vec: numpy.ndarray
+    :return: tuple containing the returns from calcSemAxis
+    :rtype: tuple
     """
     emb_filename = "{dir_name}/vec.npz".format(dir_name=filename)
     param_filename = "{dir_name}/param.json".format(dir_name=filename)
