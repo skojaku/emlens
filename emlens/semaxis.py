@@ -1,10 +1,11 @@
+import json
+import os
+import shutil
+
 import numpy as np
 import scipy
 from scipy import sparse
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-import os
-import json
-import shutil
 
 
 def calcSemAxis(
@@ -18,8 +19,7 @@ def calcSemAxis(
     return_class_vec=False,
     **params
 ):
-    """
-    Find SemAxis
+    """Find SemAxis.
 
     Parameters
     ----------
@@ -36,7 +36,7 @@ def calcSemAxis(
         For example, set dim=1 to get an axis. Setting dim=2 will generate 2d space.
         If mode='semaxis', dim is automatically set to 1.
     mode : 'semaxis', 'lda', or 'fda' (Optional; Default 'semaxis')
-        If mode='semaxis', an axis is computed based on [1]. If mode='lda', data are projected using lda. If mode='fda', Fisher discriminant analysis. 
+        If mode='semaxis', an axis is computed based on [1]. If mode='lda', data are projected using lda. If mode='fda', Fisher discriminant analysis.
         fda is often a better choice over 'lda' since lda assumes that each class has the same covariance while fda does not.
     centering : bool (Optiona; Default True)
         If True, centerize the projected data points.
@@ -68,8 +68,8 @@ def calcSemAxis(
         class_labels, class_ids = np.unique(labels, return_inverse=True)
         n_class = len(class_labels)
     else:
-        label2cids = {l: i for i, l in enumerate(label_order)}
-        class_ids = np.array([label2cids[l] for l in labels])
+        label2cids = {ll: i for i, ll in enumerate(label_order)}
+        class_ids = np.array([label2cids[ll] for ll in labels])
         n_class = len(label2cids)
 
     if mode == "semaxis":
@@ -115,8 +115,7 @@ def fisher_linear_discriminant(
     shrinkage=0,
     return_class_vec=False,
 ):
-    """
-    Fisher's linear discriminant analysis. 
+    """Fisher's linear discriminant analysis.
 
     Parameters
     ----------
@@ -131,9 +130,9 @@ def fisher_linear_discriminant(
         For example, set dim=1 to get an axis. Setting dim=2 will generate 2d space.
         If mode='semaxis', dim is automatically set to 1.
     shrinkage : float (Optional; Default 0)
-        A shrinkage parameter that controls the level of fitting of model. Useful when dimension is close to the number of data points. 
+        A shrinkage parameter that controls the level of fitting of model. Useful when dimension is close to the number of data points.
     priors : str (Optional; 'data', 'uniform', dict)
-        A prior distribution for the classes. priors='data' weight each class based on the number of data points. with priors='uniform', each 
+        A prior distribution for the classes. priors='data' weight each class based on the number of data points. with priors='uniform', each
         class will be treated equally. One can manually set a prior by passing a dict object taking keys as the class label and values as the (positive) weight.
     return_class_vec : bool (Optional; Default False)
         If return_class_vec=True, return the projection of the embedding vector with class labels.
@@ -160,16 +159,16 @@ def fisher_linear_discriminant(
         for k, lab in enumerate(labels):
             class_weight[k] = priors[lab]
     elif priors == "data":
-        for k, lab in enumerate(labels):
+        for k, _ in enumerate(labels):
             class_weight[k] = sum(group_ids == k)
     elif priors == "uniform":
-        for k, lab in enumerate(labels):
+        for k, _ in enumerate(labels):
             class_weight[k] = 1
 
     class_weight = class_weight / np.sum(class_weight)
 
     Cw = np.zeros((DIM, DIM))  # Within-class variance
-    MU = np.zeros((K, DIM))  # Mean for each class 
+    MU = np.zeros((K, DIM))  # Mean for each class
     for k in range(K):
         v_k = class_vec[group_ids == k, :]
         mu_k = np.mean(v_k, axis=0)
@@ -180,33 +179,31 @@ def fisher_linear_discriminant(
 
         Cw += class_weight[k] * np.cov(v_k.T)
 
-
     # Shrinkage
     if (shrinkage < 1) and (shrinkage > 0):
         Cw = Cw + shrinkage / (1 - shrinkage) * np.eye(DIM)
     elif shrinkage == 1:
         Cw = np.eye(DIM)
 
-    # between class 
+    # between class
     if K == 2:
-        u = np.linalg.inv(Cw) @ (MU[1,:] - MU[0,:]).reshape((DIM, 1))
+        u = np.linalg.inv(Cw) @ (MU[1, :] - MU[0, :]).reshape((DIM, 1))
         u = u / np.linalg.norm(u)
     else:
         Cb = np.zeros((DIM, DIM))  # Between-class
         mu = np.mean(MU, axis=0)
         for k in range(K):
             Cb += class_weight[k] * np.outer(MU[k, :] - mu, MU[k, :] - mu)
-    
+
         if (shrinkage < 1) and (shrinkage > 0):
             Cw = Cw + shrinkage / (1 - shrinkage) * np.eye(DIM)
         elif shrinkage == 1:
             Cw = np.eye(DIM)
-   
+
         # Solve generalized eigenvalue problem
         s, u, _ = scipy.linalg.eig(Cb, Cw, left=True)
         ids = np.argsort(-np.array(s).reshape(-1))[:dim]
-        u = u[:, ids] #@ np.diag(np.sqrt(np.real(s[ids])))
-    
+        u = u[:, ids]  # @ np.diag(np.sqrt(np.real(s[ids])))
 
     # Projection
     prj_vec = vec @ u
@@ -218,8 +215,7 @@ def fisher_linear_discriminant(
 
 
 def saveSemAxis(filename, class_vec, labels, **kwargs):
-    """
-    Save SemAxis into a file
+    """Save SemAxis into a file.
 
     Parameters
     ----------
@@ -233,17 +229,16 @@ def saveSemAxis(filename, class_vec, labels, **kwargs):
     if os.path.exists(filename):
         shutil.rmtree(filename)
     os.mkdir(filename)
-    emb_filename = "{dir_name}/vec.npz".format(dir_name = filename)
-    param_filename = "{dir_name}/param.json".format(dir_name = filename)
-    
+    emb_filename = "{dir_name}/vec.npz".format(dir_name=filename)
+    param_filename = "{dir_name}/param.json".format(dir_name=filename)
+
     np.savez(emb_filename, class_vec=class_vec, labels=labels)
     with open(param_filename, "w") as f:
         json.dump(kwargs, f)
 
 
 def calcSemAxis_from_file(filename, vec, **params):
-    """
-    Calculate SemAxis from file
+    """Calculate SemAxis from file.
 
     Parameters
     ----------
@@ -257,16 +252,16 @@ def calcSemAxis_from_file(filename, vec, **params):
     -------
     return : return from calcSemAxis
     """
-    emb_filename = "{dir_name}/vec.npz".format(dir_name = filename)
-    param_filename = "{dir_name}/param.json".format(dir_name = filename)
+    emb_filename = "{dir_name}/vec.npz".format(dir_name=filename)
+    param_filename = "{dir_name}/param.json".format(dir_name=filename)
 
     data = np.load(emb_filename, allow_pickle=True)
     class_vec = data["class_vec"]
     labels = data["labels"]
-    
+
     with open(param_filename, "r") as f:
         saved_params = json.load(f)
-   
+
     if isinstance(params, dict):
         for k, v in params.items():
             saved_params[k] = v
