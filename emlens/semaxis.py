@@ -19,8 +19,9 @@ def calcSemAxis(
     return_class_vec=False,
     **params
 ):
-    """[summary]
-
+    """
+    SemAxis
+    
     :param vec: embedding vectors
     :type vec: numpy.ndarray (num_entities, dim)
     :param class_vec: labeled vectors
@@ -38,17 +39,17 @@ def calcSemAxis(
     :param return_class_vec: whether to return the projected labeled vector, defaults to False
     :type return_class_vec: bool, optional
     :return: tuple containing
-        retvec : np.array, shape=(num_data, dim)
+
+        - retvec : np.array, shape=(num_data, dim)
             The vectors for the data points projected onto semaxis (or semspace).
-        class_vec : np.array, shape=(num_data_with_labels, dim) (Optional)
+        - class_vec : np.array, shape=(num_data_with_labels, dim) (Optional)
             The projection of vectors used to construct the axis (or space).
             This variable is returned only when return_class_vec=True.
-        labels : np.array, shape=(num_data_with_labels,) (Optional)
+        - labels : np.array, shape=(num_data_with_labels,) (Optional)
             The class labels for vectors used to construct the axis (or space).
             This variable is returned only when return_class_vec=True.
     :rtype: tuple
     """
-
     def calc_mean_vec(vec, s=None):
         if s is None:
             return np.mean(vec, axis=0) if vec.shape[1] > 1 else np.mean(vec)
@@ -106,8 +107,9 @@ def fisher_linear_discriminant(
     shrinkage=0,
     return_class_vec=False,
 ):
-    """Fisher's linear discriminant analysis.
-
+    """
+    Fisher's linear discriminant analysis.
+    
     :param vec: embedding vectors
     :type vec: numpy.ndarray (num_entities, dim)
     :param class_vec: labeled vectors
@@ -124,12 +126,13 @@ def fisher_linear_discriminant(
     :type return_class_vec: bool, optional
     :return: tuple containing
     :rtype: tuple
-        retvec : np.array, shape=(num_data, dim)
+
+        - retvec : np.array, shape=(num_data, dim)
             The vectors for the data points projected onto semaxis (or semspace).
-        class_vec : np.array, shape=(num_data_with_labels, dim) (Optional)
+        - class_vec : np.array, shape=(num_data_with_labels, dim) (Optional)
             The projection of vectors used to construct the axis (or space).
             This variable is returned only when return_class_vec=True.
-        labels : np.array, shape=(num_data_with_labels,) (Optional)
+        - labels : np.array, shape=(num_data_with_labels,) (Optional)
             The class labels for vectors used to construct the axis (or space).
             This variable is returned only when return_class_vec=True.
     """
@@ -200,8 +203,9 @@ def fisher_linear_discriminant(
 
 
 def saveSemAxis(filename, class_vec, labels, **kwargs):
-    """Save SemAxis into a file.
-
+    """
+    Save SemAxis into a file.
+    
     :param filename: name of file
     :type filename: str
     :param class_vec: embedding vectors for labeled entities
@@ -209,7 +213,6 @@ def saveSemAxis(filename, class_vec, labels, **kwargs):
     :param labels: labels
     :type labels: numpy.ndarray
     """
-
     if os.path.exists(filename):
         shutil.rmtree(filename)
     os.mkdir(filename)
@@ -222,8 +225,9 @@ def saveSemAxis(filename, class_vec, labels, **kwargs):
 
 
 def calcSemAxis_from_file(filename, vec, **params):
-    """Calculate SemAxis from file.
-
+    """
+    Calculate SemAxis from file.
+    
     :param filename: filename
     :type filename: str
     :param vec: Embedding vectors
