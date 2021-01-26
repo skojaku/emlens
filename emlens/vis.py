@@ -1,9 +1,10 @@
-import numpy as np
-from scipy import sparse
-from adjustText import adjust_text
-import matplotlib.pyplot as plt
-import matplotlib.patheffects as PathEffects
 import textwrap
+
+import matplotlib.patheffects as PathEffects
+import matplotlib.pyplot as plt
+import numpy as np
+from adjustText import adjust_text
+from scipy import sparse
 
 
 def repel_labels(
@@ -17,8 +18,8 @@ def repel_labels(
     text_params={},
     adjust_text_params={},
 ):
-    """
-    Add text labels to the points. The position of text will be automatically adjusted to avoid overlap.
+    """Add text labels to the points. The position of text will be
+    automatically adjusted to avoid overlap.
 
     Parameters
     ----------
