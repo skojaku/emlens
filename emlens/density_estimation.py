@@ -1,13 +1,12 @@
 import numpy as np
+from joblib import Parallel, delayed
 from scipy import sparse
 from sklearn.neighbors import KernelDensity
-from joblib import Parallel, delayed
 
-def estimate_pdf(locations, emb, kernel="epanechnikov", n_jobs=30):
-    """
-   
-    Estimate the density of points at given locations in embedding space.
-    A kernel density estimation is used to compute the density.
+
+def estimate_pdf(locations, emb, kernel="epanechnikov", dh=None, n_jobs=30):
+    """Estimate the density of points at given locations in embedding space. A
+    kernel density estimation is used to compute the density.
 
     Parameters
     ----------
@@ -26,9 +25,10 @@ def estimate_pdf(locations, emb, kernel="epanechnikov", n_jobs=30):
     prob_density : numpy.array (num_locations,)
         Density of points given by `emb` at `locations`.
     """
-    dh = np.power(
-        emb.shape[0], -1.0 / (emb.shape[1] + 4)
-    )  # Silverman's rule-of-thumb rule
+    if dh is None:
+        dh = np.power(
+            emb.shape[0], -1.0 / (emb.shape[1] + 4)
+        )  # Silverman's rule-of-thumb rule
     kde = KernelDensity(kernel=kernel, bandwidth=dh).fit(emb)
 
     def est(kde, locations, ids):
