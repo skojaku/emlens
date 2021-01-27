@@ -13,7 +13,7 @@ Jinja2
 kiwisolver
 MarkupSafe
 matplotlib
-numpy
+numpy==1.16.5
 olefile
 packaging
 Pillow

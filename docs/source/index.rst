@@ -17,9 +17,13 @@ This package is under active development. If you have issues and feature request
 
    modules
 
+Install
+*******
+See `project page <https://github.com/skojaku/emlens>`_
 
-Examples
-********
+
+Example
+*******
 - `airport networks <https://github.com/skojaku/emlens/blob/main/examples/airport-net.ipynb>`_
 
 
