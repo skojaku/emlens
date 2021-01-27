@@ -89,16 +89,15 @@ def load_airport():
 
 
 if __name__ == "__main__":
+
     net, membership, node_table = load_airport()
     r, c, v = sparse.find(net)
     edge_table = pd.DataFrame({"source": r, "target": c, "weight": v})
 
-    sparse.save_npz("airportnet.npz", net)
-    np.save("membership.npy", membership)
-    node_table.to_csv("airports.csv", index=False)
-    edge_table.to_csv("airportnet.csv", index=False)
-
     model = r2v.DeepWalk(window_length=5, restart_prob=0)
     model.fit(net)
     in_vec = model.transform(dim=32)
+    
+    node_table.to_csv("nodes.csv", index=False)
+    edge_table.to_csv("edges.csv", index=False)
     np.savetxt("emb.txt", in_vec)
