@@ -1,10 +1,10 @@
 # emlens
 A lightweight toolbox for analyzing embedding space
 
-# Doc
+## Doc
 [[https://emlens.readthedocs.io/en/latest/]]
 
-# Install
+## Install
 
 With conda: (change `myenv` to your env name) 
 ```
@@ -16,7 +16,7 @@ With pip:
 pip install .
 ```
 
-# Maintenance
+## Maintenance
 
 Code Linting:
 ```bash
@@ -26,7 +26,7 @@ pre-commit install
 
 Docsctring: sphinx format
 
-# Test
+## Test
 
 
 
