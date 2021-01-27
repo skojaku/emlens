@@ -18,6 +18,14 @@ def estimate_pdf(locations, emb, C0=0.1):
     :type C: str, optional
     :return: Density of points given by `emb` at `locations`.
     :rtype: numpy.ndarray (num_locations,)
+    
+    .. highlight:: python
+    .. code-block:: python 
+
+        >>> import emlens
+        >>> import numpy as np
+        >>> emb = np.random.randn(100, 20)
+        >>> density = emlens.make_knn_graph(locations=emb, emb = emb)
     """
     n = emb.shape[0]
     dim = emb.shape[1]
