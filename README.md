@@ -1,17 +1,33 @@
 # emlens
 A lightweight toolbox for analyzing embedding space
 
-### APIs
-See [here](doc/apis.md).
+# Doc
+[[https://emlens.readthedocs.io/en/latest/]]
 
-### When adding your tools
-- Write a docscring in a standard format (like numpydoc and others)
-- Please update doc/apis.md (there is a script to automate this process)
+# Install
 
-### Update apis.md
-Under the repository root directory, run 
-
+With conda: (change `myenv` to your env name) 
 ```
-bash scripts/generate-doc.sh
-``` 
-which will automatically generate doc/apis.md. `pdoc` is needed to run this script.
+conda env update -n myenv --file ENV.yaml
+```
+
+With pip: 
+```
+pip install .
+```
+
+# Maintenance
+
+Code Linting:
+```bash
+conda install -y -c conda-forge pre-commit
+pre-commit install
+```
+
+Docsctring: sphinx format
+
+# Test
+
+
+
+
