@@ -8,6 +8,3 @@ setup(name='emlens',
       author = 'Sadamori Kojaku', 
       packages=find_packages(),
       zip_safe=False)
-
-if not os.getenv('READTHEDOCS'):
-    install_requires.append('faiss')

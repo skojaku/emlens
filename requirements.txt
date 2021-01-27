@@ -1,3 +1,4 @@
+faiss
 adjustText
 alabaster
 Babel
