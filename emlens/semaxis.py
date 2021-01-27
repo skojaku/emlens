@@ -39,18 +39,26 @@ def SemAxis(
     :type return_class_vec: bool, optional
     :return: tuple containing
 
-        - retvec : np.array, shape=(num_data, dim)
+        retvec : np.array, shape=(num_data, dim)
+
             The vectors for the data points projected onto semaxis (or semspace).
-        - class_vec : np.array, shape=(num_data_with_labels, dim) (Optional)
+
+        class_vec : np.array, shape=(num_data_with_labels, dim) (Optional)
+
             The projection of vectors used to construct the axis (or space).
+
             This variable is returned only when return_class_vec=True.
-        - labels : np.array, shape=(num_data_with_labels,) (Optional)
+
+        labels : np.array, shape=(num_data_with_labels,) (Optional)
+
             The class labels for vectors used to construct the axis (or space).
+
             This variable is returned only when return_class_vec=True.
+
     :rtype: tuple
-    
+
     .. highlight:: python
-    .. code-block:: python 
+    .. code-block:: python
 
         >>> import emlens
         >>> import numpy as np
@@ -135,12 +143,17 @@ def fisher_linear_discriminant(
     :return: tuple containing
     :rtype: tuple
 
-        - retvec : np.array, shape=(num_data, dim)
+        retvec : np.array, shape=(num_data, dim)
+
             The vectors for the data points projected onto semaxis (or semspace).
-        - class_vec : np.array, shape=(num_data_with_labels, dim) (Optional)
+
+        class_vec : np.array, shape=(num_data_with_labels, dim) (Optional)
+
             The projection of vectors used to construct the axis (or space).
             This variable is returned only when return_class_vec=True.
-        - labels : np.array, shape=(num_data_with_labels,) (Optional)
+
+        labels : np.array, shape=(num_data_with_labels,) (Optional)
+
             The class labels for vectors used to construct the axis (or space).
             This variable is returned only when return_class_vec=True.
     """
@@ -219,9 +232,9 @@ def saveSemAxis(filename, class_vec, labels, **kwargs):
     :type class_vec: numpy.ndarray
     :param labels: labels
     :type labels: numpy.ndarray
-    
+
     .. highlight:: python
-    .. code-block:: python 
+    .. code-block:: python
 
         >>> import emlens
         >>> import numpy as np
@@ -249,9 +262,9 @@ def SemAxis_from_file(filename, vec, **params):
     :type vec: numpy.ndarray
     :return: tuple containing the returns from SemAxis
     :rtype: tuple
-    
+
     .. highlight:: python
-    .. code-block:: python 
+    .. code-block:: python
 
         >>> import emlens
         >>> xy = emlens.SemAxis_from_file('semspace', emb)
