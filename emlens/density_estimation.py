@@ -10,7 +10,7 @@ def estimate_pdf(locations, emb, C0=0.1):
     Reference
     https://faculty.washington.edu/yenchic/18W_425/Lec7_knn_basis.pdf
 
-    :params: locations: Location at which the density is calculated.
+    :params locations: Location at which the density is calculated.
     :type locations: numpy.array, shape=(num_locations, dim)
     :params emb: Embedding vectors of points
     :type emb: numpy.ndarray, (num_point, dim)
@@ -18,9 +18,9 @@ def estimate_pdf(locations, emb, C0=0.1):
     :type C: str, optional
     :return: Density of points given by `emb` at `locations`.
     :rtype: numpy.ndarray (num_locations,)
-    
+
     .. highlight:: python
-    .. code-block:: python 
+    .. code-block:: python
 
         >>> import emlens
         >>> import numpy as np
