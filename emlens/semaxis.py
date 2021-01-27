@@ -8,7 +8,7 @@ from scipy import sparse
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 
-def calcSemAxis(
+def SemAxis(
     vec,
     class_vec,
     labels,
@@ -19,9 +19,8 @@ def calcSemAxis(
     return_class_vec=False,
     **params
 ):
-    """
-    SemAxis
-    
+    """SemAxis.
+
     :param vec: embedding vectors
     :type vec: numpy.ndarray (num_entities, dim)
     :param class_vec: labeled vectors
@@ -50,6 +49,7 @@ def calcSemAxis(
             This variable is returned only when return_class_vec=True.
     :rtype: tuple
     """
+
     def calc_mean_vec(vec, s=None):
         if s is None:
             return np.mean(vec, axis=0) if vec.shape[1] > 1 else np.mean(vec)
@@ -107,9 +107,8 @@ def fisher_linear_discriminant(
     shrinkage=0,
     return_class_vec=False,
 ):
-    """
-    Fisher's linear discriminant analysis.
-    
+    """Fisher's linear discriminant analysis.
+
     :param vec: embedding vectors
     :type vec: numpy.ndarray (num_entities, dim)
     :param class_vec: labeled vectors
@@ -203,9 +202,8 @@ def fisher_linear_discriminant(
 
 
 def saveSemAxis(filename, class_vec, labels, **kwargs):
-    """
-    Save SemAxis into a file.
-    
+    """Save SemAxis into a file.
+
     :param filename: name of file
     :type filename: str
     :param class_vec: embedding vectors for labeled entities
@@ -224,15 +222,14 @@ def saveSemAxis(filename, class_vec, labels, **kwargs):
         json.dump(kwargs, f)
 
 
-def calcSemAxis_from_file(filename, vec, **params):
-    """
-    Calculate SemAxis from file.
-    
+def SemAxis_from_file(filename, vec, **params):
+    """Calculate SemAxis from file.
+
     :param filename: filename
     :type filename: str
     :param vec: Embedding vectors
     :type vec: numpy.ndarray
-    :return: tuple containing the returns from calcSemAxis
+    :return: tuple containing the returns from SemAxis
     :rtype: tuple
     """
     emb_filename = "{dir_name}/vec.npz".format(dir_name=filename)
@@ -248,4 +245,4 @@ def calcSemAxis_from_file(filename, vec, **params):
     if isinstance(params, dict):
         for k, v in params.items():
             saved_params[k] = v
-    return calcSemAxis(vec, class_vec, labels, **saved_params)
+    return SemAxis(vec, class_vec, labels, **saved_params)

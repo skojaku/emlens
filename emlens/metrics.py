@@ -6,8 +6,6 @@ from sklearn import utils
 from sklearn.metrics import average_precision_score, roc_curve
 from tqdm import tqdm
 
-from .semaxis import calcSemAxis
-
 
 def make_knn_graph(X, k=5):
     """Construct the kNN graph.
@@ -32,15 +30,13 @@ def make_knn_graph(X, k=5):
     return A
 
 
-def calc_assortativity(emb, y, label_type="cont", A=None, k=5):
+def assortativity(emb, y, A=None, k=5):
     """Calculate the assortativity for a KNN graph constructed based on the.
 
     :param emb: embedding vectors
     :type emb: numpy.ndarray (num_entities, dim)
     :param y: labels for entities
     :type y: nuimpy.ndarray or list
-    :param label_type: type of labels, defaults to "cont"
-    :type label_type: str, optional
     :param A: precomputed graph, defaults to None
     :type A: scipy.csr_matrix, optional
     :param k: Number of neighbors, defaults to 5
@@ -53,21 +49,40 @@ def calc_assortativity(emb, y, label_type="cont", A=None, k=5):
         A = make_knn_graph(emb, k=k)
     r, c, v = sparse.find(A)
 
-    if label_type == "cont":
-        return stats.pearsonr(y[r], y[c])[0]
-    elif label_type == "disc":
-        deg = np.array(A.sum(axis=0))
-        labels, yids = np.unique(y, return_inverse=True)
-        U = sparse.csr_matrix(
-            (np.ones_like(yids), (np.arange(yids.size), yids)),
-            shape=(yids.size, len(labels)),
-        )
-        D = np.array(deg.reshape(1, -1) @ U).reshape(-1)
-        Q = np.trace((U.T @ A @ U) - np.outer(D, D) / np.sum(D)) / np.sum(D)
-        return Q
+    return stats.pearsonr(y[r], y[c])[0]
 
 
-def calc_pairwise_dot_sim(X, y):
+def modularity(emb, y, A=None, k=5):
+    """Calculate the assortativity for a KNN graph constructed based on the.
+
+    :param emb: embedding vectors
+    :type emb: numpy.ndarray (num_entities, dim)
+    :param y: labels for entities
+    :type y: nuimpy.ndarray or list
+    :param A: precomputed graph, defaults to None
+    :type A: scipy.csr_matrix, optional
+    :param k: Number of neighbors, defaults to 5
+    :type k: int, optional
+    :return: assortativity index
+    :rtype: sparse.csr_matrix
+    """
+
+    if A is None:
+        A = make_knn_graph(emb, k=k)
+    r, c, v = sparse.find(A)
+
+    deg = np.array(A.sum(axis=0))
+    labels, yids = np.unique(y, return_inverse=True)
+    U = sparse.csr_matrix(
+        (np.ones_like(yids), (np.arange(yids.size), yids)),
+        shape=(yids.size, len(labels)),
+    )
+    D = np.array(deg.reshape(1, -1) @ U).reshape(-1)
+    Q = np.trace((U.T @ A @ U) - np.outer(D, D) / np.sum(D)) / np.sum(D)
+    return Q
+
+
+def pairwise_dot_sim(X, y):
     """Pairwise dot similarity between groups. The dot similarity between two
     groups is computed by averaging over the dot similarity between entities in
     the groups.
@@ -92,7 +107,7 @@ def calc_pairwise_dot_sim(X, y):
     return S, labels
 
 
-def calc_pairwise_distance(X, y):
+def pairwise_distance(X, y):
     """Pairwise distance between groups. The distance between two groups is the
     distance between the centroid of the groups.
 
