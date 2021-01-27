@@ -1,16 +1,56 @@
 import unittest
+
+import numpy as np
+import pandas as pd
+from scipy import sparse
+
 import emlens
 
+
 class TestCalc(unittest.TestCase):
- 
-  def test_add_num(self):
-    self.assertEqual(10, calc.add_num(6, 4)) 
- 
-  def test_sub_num(self):
-    self.assertEqual(2, calc.sub_num(6, 4))
+    def setUp(self):
+        emb_url = "https://raw.githubusercontent.com/skojaku/emlens/main/data/airportnet/emb.txt"
+        node_url = "https://raw.githubusercontent.com/skojaku/emlens/main/data/airportnet/nodes.csv"
+        edge_url = "https://raw.githubusercontent.com/skojaku/emlens/main/data/airportnet/edges.csv"
+        self.emb = np.loadtxt(emb_url)
+        self.node_table = pd.read_csv(node_url)
+        edge_table = pd.read_csv(edge_url)
 
-  def test_mul_num(self):
-    self.assertEqual(24, calc.mul_num(6, 4))
+        N = self.node_table.shape[0]
+        self.net = sparse.csr_matrix(
+            (edge_table.weight, (edge_table.source, edge_table.target)), shape=(N, N)
+        )
+        self.deg = np.array(self.net.sum(axis=0)).reshape(-1)  # calculate the degree
 
-  def test_div_num(self):
-    self.assertEqual(10, calc.div_num(6, 4))
+    def test_semaxis(self):
+        for mode in ["fda", "lda"]:
+            xy = emlens.SemAxis(
+                vec=self.emb,
+                class_vec=self.emb,
+                labels=self.node_table["region"].values,
+                dim=2,
+                mode=mode,
+            )
+            self.assertEqual(xy.shape[0], self.emb.shape[0])
+            self.assertEqual(xy.shape[1], 2)
+
+    def test_assortativity(self):
+        rho = emlens.assortativity(self.emb, self.deg)
+
+    def test_modularity(self):
+        rho = emlens.modularity(self.emb, self.node_table["region"])
+
+    def test_pairwise_dot_similarity(self):
+        S, labels = emlens.pairwise_dot_sim(self.emb, self.node_table["region"])
+        self.assertEqual(S.shape[1], 6)
+
+    def test_pairwise_distance(self):
+        S, labels = emlens.pairwise_distance(self.emb, self.node_table["region"])
+        self.assertEqual(S.shape[1], 6)
+
+    def test_estimate_pdf(self):
+        density = emlens.estimate_pdf(locations=self.emb, emb=self.emb)
+
+
+if __name__ == "__main__":
+    unittest.main()
