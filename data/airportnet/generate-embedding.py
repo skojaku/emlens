@@ -97,7 +97,7 @@ if __name__ == "__main__":
     model = r2v.DeepWalk(window_length=5, restart_prob=0)
     model.fit(net)
     in_vec = model.transform(dim=32)
-    
+
     node_table.to_csv("nodes.csv", index=False)
     edge_table.to_csv("edges.csv", index=False)
     np.savetxt("emb.txt", in_vec)
