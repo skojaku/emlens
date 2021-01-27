@@ -6,10 +6,10 @@
 Emlens
 ======
 
-``emlens`` is a lighweight python package for understanding high dimensional embedding space. Embedding is often very high dimensional, which is easy to understand for computers but for humans.
-This ``emlens`` aims to fill the gap by providing a set of tools for visualizing the embedding space (semaxis module), quantifying correlation to metadata (metrics module), and calculating densities (density_estimation module).
+Embedding is a potent to tool for generating a vector representation of words and networks. To fully leverage its utility, the embedding space needs to be high dimensional. 
+While computers have no problem in understanding high dimensional space, our brains do not. This ``emlens`` aims to fill the gap by providing a set of tools for visualizing the embedding space, quantifying correlation to metadata, and calculating densities.
 
-This package is still under active development. If you have issues and feature request, please raise them through `Github <https://github.com/skojaku/emlens>`_..
+This package is under active development. If you have issues and feature requests, please raise them through `Github <https://github.com/skojaku/emlens>`_.
 
 .. toctree::
    :maxdepth: 2
@@ -19,12 +19,12 @@ This package is still under active development. If you have issues and feature r
 
 
 Examples
-========
-- `airport networks <>`
+********
+- `airport networks <https://github.com/skojaku/emlens/blob/main/examples/airport-net.ipynb>`_
 
 
 Indices and tables
-==================
+******************
 
 * :ref:`genindex`
 * :ref:`modindex`

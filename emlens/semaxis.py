@@ -48,6 +48,15 @@ def SemAxis(
             The class labels for vectors used to construct the axis (or space).
             This variable is returned only when return_class_vec=True.
     :rtype: tuple
+    
+    .. highlight:: python
+    .. code-block:: python 
+
+        >>> import emlens
+        >>> import numpy as np
+        >>> emb = np.random.randn(100, 20)
+        >>> labels = np.random.choice(100, 10)
+        >>> xy = emlens.SemAxis(vec = emb, class_vec = emb, labels = labels, dim=2, mode = "fda")
     """
 
     def calc_mean_vec(vec, s=None):
@@ -210,6 +219,15 @@ def saveSemAxis(filename, class_vec, labels, **kwargs):
     :type class_vec: numpy.ndarray
     :param labels: labels
     :type labels: numpy.ndarray
+    
+    .. highlight:: python
+    .. code-block:: python 
+
+        >>> import emlens
+        >>> import numpy as np
+        >>> emb = np.random.randn(100, 20)
+        >>> labels = np.random.choice(100, 10)
+        >>> emlens.saveSemAxis('semspace', class_vec = emb, labels = labels, dim=2, mode = "fda")
     """
     if os.path.exists(filename):
         shutil.rmtree(filename)
@@ -231,6 +249,12 @@ def SemAxis_from_file(filename, vec, **params):
     :type vec: numpy.ndarray
     :return: tuple containing the returns from SemAxis
     :rtype: tuple
+    
+    .. highlight:: python
+    .. code-block:: python 
+
+        >>> import emlens
+        >>> xy = emlens.SemAxis_from_file('semspace', emb)
     """
     emb_filename = "{dir_name}/vec.npz".format(dir_name=filename)
     param_filename = "{dir_name}/param.json".format(dir_name=filename)
