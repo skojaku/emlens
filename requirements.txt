@@ -1,4 +1,5 @@
 faiss
+pandas
 adjustText
 alabaster
 Babel
