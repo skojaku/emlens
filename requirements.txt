@@ -1,3 +1,4 @@
+faiss
 adjustText
 alabaster
 Babel
@@ -5,7 +6,6 @@ certifi
 chardet
 cycler
 docutils
-faiss
 idna
 imagesize
 Jinja2

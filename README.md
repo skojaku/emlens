@@ -13,7 +13,7 @@ conda env update -n myenv --file ENV.yaml
 
 With pip: 
 ```
-pip install .
+pip install -r requirements.txt .
 ```
 
 ## Maintenance
@@ -26,8 +26,10 @@ pre-commit install
 
 Docsctring: sphinx format
 
-## Test
-
+Test:
+```bash
+python -m unittest tests/apitest.py
+```
 
 
 
