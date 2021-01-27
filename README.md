@@ -26,8 +26,10 @@ pre-commit install
 
 Docsctring: sphinx format
 
-## Test
-
+Test:
+```bash
+python -m unittest tests/apitest.py
+```
 
 
 
