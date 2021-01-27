@@ -5,7 +5,6 @@ certifi
 chardet
 cycler
 docutils
-faiss
 idna
 imagesize
 Jinja2
