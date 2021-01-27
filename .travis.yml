@@ -5,6 +5,7 @@ python:
 before_install:
   - sudo apt-get install build-essential git
   - sudo apt-get install libopenblas-dev
+  - sudo apt install libomp-dev
 
 # command to install dependencies
 install:
