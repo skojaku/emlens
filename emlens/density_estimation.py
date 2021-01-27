@@ -7,17 +7,17 @@ def estimate_pdf(locations, emb, C0=0.1):
     """Estimate the density of points at given locations in embedding space
     using the KNN desity estimator.
 
-    Reference
-    https://faculty.washington.edu/yenchic/18W_425/Lec7_knn_basis.pdf
-
-    :params locations: Location at which the density is calculated.
+    :param locations: Location at which the density is calculated.
     :type locations: numpy.array, shape=(num_locations, dim)
-    :params emb: Embedding vectors of points
+    :param emb: Embedding vectors of points
     :type emb: numpy.ndarray, (num_point, dim)
-    :params C: Parameter for band width. Roughly C * emb.shape[0] nearest neighbors will be used for density estimation.
+    :param C: Parameter for band width. Roughly C * emb.shape[0] nearest neighbors will be used for density estimation.
     :type C: str, optional
     :return: Density of points given by `emb` at `locations`.
     :rtype: numpy.ndarray (num_locations,)
+
+    Reference
+    https://faculty.washington.edu/yenchic/18W_425/Lec7_knn_basis.pdf
 
     .. highlight:: python
     .. code-block:: python

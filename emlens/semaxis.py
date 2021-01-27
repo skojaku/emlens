@@ -37,25 +37,14 @@ def SemAxis(
     :type centering: bool, optional
     :param return_class_vec: whether to return the projected labeled vector, defaults to False
     :type return_class_vec: bool, optional
-    :return: tuple containing
+    :return: retvec, class_vec, labels 
 
-        retvec : np.array, shape=(num_data, dim)
-
-            The vectors for the data points projected onto semaxis (or semspace).
-
-        class_vec : np.array, shape=(num_data_with_labels, dim) (Optional)
-
-            The projection of vectors used to construct the axis (or space).
-
-            This variable is returned only when return_class_vec=True.
-
-        labels : np.array, shape=(num_data_with_labels,) (Optional)
-
-            The class labels for vectors used to construct the axis (or space).
-
-            This variable is returned only when return_class_vec=True.
-
-    :rtype: tuple
+        * **retvec**: The vectors for the data points projected onto semaxis (or semspace).
+            
+        * **class_vec**: The projection of vectors used to construct the axis (or space). This variable is returned only when return_class_vec=True.
+            
+        * **labels**: The class labels for vectors used to construct the axis (or space). This variable is returned only when return_class_vec=True.
+    :rtype: numpy.ndarray (num_data, dim), numpy.ndarray (num_data_with_labels, dim), numpy.ndarray (num_data_with_labels, ) 
 
     .. highlight:: python
     .. code-block:: python
@@ -140,22 +129,14 @@ def fisher_linear_discriminant(
     :type shrinkage: int, optional
     :param return_class_vec: whether to return the projected labeled entities, defaults to False
     :type return_class_vec: bool, optional
-    :return: tuple containing
-    :rtype: tuple
+    :return: retvec, class_vec, labels 
 
-        retvec : np.array, shape=(num_data, dim)
-
-            The vectors for the data points projected onto semaxis (or semspace).
-
-        class_vec : np.array, shape=(num_data_with_labels, dim) (Optional)
-
-            The projection of vectors used to construct the axis (or space).
-            This variable is returned only when return_class_vec=True.
-
-        labels : np.array, shape=(num_data_with_labels,) (Optional)
-
-            The class labels for vectors used to construct the axis (or space).
-            This variable is returned only when return_class_vec=True.
+        * **retvec**: The vectors for the data points projected onto semaxis (or semspace).
+            
+        * **class_vec**: The projection of vectors used to construct the axis (or space). This variable is returned only when return_class_vec=True.
+            
+        * **labels**: The class labels for vectors used to construct the axis (or space). This variable is returned only when return_class_vec=True.
+    :rtype: numpy.ndarray (num_data, dim), numpy.ndarray (num_data_with_labels, dim), numpy.ndarray (num_data_with_labels, ) 
     """
 
     labels, group_ids = np.unique(class_labels, return_inverse=True)
