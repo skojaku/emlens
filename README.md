@@ -2,7 +2,8 @@
 A lightweight toolbox for analyzing embedding space
 
 ## Doc
-[[https://emlens.readthedocs.io/en/latest/]]
+
+https://emlens.readthedocs.io/en/latest/
 
 ## Install
 
