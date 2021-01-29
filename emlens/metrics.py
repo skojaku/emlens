@@ -17,9 +17,9 @@ def make_knn_graph(emb, k=5):
     :type k: int, optional
     :return: KNN graph
     :rtype: sparse.csr_matrix
-   
+
     .. highlight:: python
-    .. code-block:: python 
+    .. code-block:: python
 
         >>> import emlens
         >>> import numpy as np
@@ -52,9 +52,9 @@ def assortativity(emb, y, A=None, k=5):
     :type k: int, optional
     :return: assortativity index
     :rtype: sparse.csr_matrix
-   
+
     .. highlight:: python
-    .. code-block:: python 
+    .. code-block:: python
 
         >>> import emlens
         >>> import numpy as np
@@ -83,9 +83,9 @@ def modularity(emb, y, A=None, k=5):
     :type k: int, optional
     :return: assortativity index
     :rtype: sparse.csr_matrix
-    
+
     .. highlight:: python
-    .. code-block:: python 
+    .. code-block:: python
 
         >>> import emlens
         >>> import numpy as np
@@ -120,9 +120,9 @@ def pairwise_dot_sim(emb, y):
     :type y: numpy.ndarray or list
     :return: Similarity matrix S, and labels for groups
     :rtype: numpy.ndarray, numpy.ndarray
-    
+
     .. highlight:: python
-    .. code-block:: python 
+    .. code-block:: python
 
         >>> import emlens
         >>> import numpy as np
@@ -155,9 +155,9 @@ def pairwise_distance(emb, y):
     :type y: numpy.ndarray or list
     :return: Distance matrix D, and labels for groups
     :rtype: numpy.ndarray, numpy.ndarray
-    
+
     .. highlight:: python
-    .. code-block:: python 
+    .. code-block:: python
 
         >>> import emlens
         >>> import numpy as np
@@ -186,18 +186,19 @@ def pairwise_distance(emb, y):
 
 
 def radius_of_gyration(emb, distance_function="euc"):
-    """Calculate radius of gyration -- atypicalness for sets of embedding vectors
-    For the detail, please read https://en.wikipedia.org/wiki/Radius_of_gyration
-    
-    :param emb: embedding
+    """Calculate the radius of gyration -- atypicalness for sets of embedding
+    vectors For the detail, please read
+    https://en.wikipedia.org/wiki/Radius_of_gyration.
+
+    :param emb: embedding vector (num_entities, dim)
     :type emb: numpy.ndarray
-    :param distance_function: only cosine distance ('cos') and eucliduan distance ('euc') are supported now.
-    :type y: str Type of distance function 
-    :return: Distance matrix D, and labels for groups
-    :rtype: numpy.ndarray, numpy.ndarray
-    
+    :param distance_function: only cosine distance ('cos') and eucliduan distance ('euc') are supported.
+    :type distance_function: str
+    :return: ROG value
+    :rtype: float
+
     .. highlight:: python
-    .. code-block:: python 
+    .. code-block:: python
 
         >>> import emlens
         >>> import numpy as np
