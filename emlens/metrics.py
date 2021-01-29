@@ -184,7 +184,8 @@ def pairwise_distance(emb, y):
                 D[ll, k] = d
     return D, labels
 
-def radius_of_gyration(emb, distance_function='euc'):
+
+def radius_of_gyration(emb, distance_function="euc"):
     """Calculate radius of gyration -- atypicalness for sets of embedding vectors
     For the detail, please read https://en.wikipedia.org/wiki/Radius_of_gyration
     
@@ -203,14 +204,18 @@ def radius_of_gyration(emb, distance_function='euc'):
         >>> emb = np.random.randn(100, 20)
         >>> rog = emlens.pairwise_distance(emb, 'cos')
     """
-    
+
     mean_vec = emb.mean(axis=0)
-    if distance_function == 'euc':
+    if distance_function == "euc":
         diff_emb = emb - mean_vec
         rog = np.sqrt(np.mean(np.sum(np.power(diff_emb, 2), axis=1)))
-    elif distance_function == 'cos':
+    elif distance_function == "cos":
         rog = np.sqrt(np.mean(np.power(1 - cosine_similarity(emb, [mean_vec]), 2)))
     else:
-        raise NotImplementedError("radious of gyration function does not support distance_function: {}".format(distance_function))
-        
+        raise NotImplementedError(
+            "radious of gyration function does not support distance_function: {}".format(
+                distance_function
+            )
+        )
+
     return rog
