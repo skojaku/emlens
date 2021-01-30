@@ -63,6 +63,7 @@ dependencies:
     - babel==2.9.0
     - chardet==4.0.0
     - docutils==0.16
+    - emlens==0.0.1
     - idna==2.10
     - imagesize==1.2.0
     - jinja2==2.11.2
