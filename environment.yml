@@ -1,6 +1,8 @@
 name: emlens
 channels:
   - conda-forge
+  - ostrokach-forge
+  - pkgw-forge
   - defaults
 dependencies:
   - adjusttext=0.7.3.1=py_1
@@ -34,12 +36,14 @@ dependencies:
   - numpy=1.19.5=py38h6ced74f_1
   - olefile=0.46=pyh9f0ad1d_1
   - openssl=1.1.1i=h35c211d_0
+  - pandas=1.2.1=py38he9f00de_0
   - pillow=8.1.0=py38hc1d52f7_1
   - pip=20.3.3=py38hecd8cb5_0
   - pyparsing=2.4.7=pyh9f0ad1d_0
   - python=3.8.5=h26836e1_1
   - python-dateutil=2.8.1=py_0
   - python_abi=3.8=1_cp38
+  - pytz=2020.5=pyhd8ed1ab_0
   - readline=8.0=h1de35cc_0
   - scikit-learn=0.24.1=py38hfd19401_0
   - scipy=1.6.0=py38h95ea19e_0
@@ -65,7 +69,6 @@ dependencies:
     - markupsafe==1.1.1
     - packaging==20.8
     - pygments==2.7.4
-    - pytz==2020.5
     - requests==2.25.1
     - snowballstemmer==2.1.0
     - sphinx==3.4.3
@@ -77,5 +80,4 @@ dependencies:
     - sphinxcontrib-qthelp==1.0.3
     - sphinxcontrib-serializinghtml==1.1.4
     - urllib3==1.26.3
-prefix: /Users/skojaku-admin/opt/anaconda3/envs/emlens
-
+prefix: //anaconda3/envs/emlens
