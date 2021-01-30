@@ -50,6 +50,10 @@ class TestCalc(unittest.TestCase):
 
     def test_estimate_pdf(self):
         density = emlens.estimate_pdf(locations=self.emb, emb=self.emb)
+        
+    def calculate_rog(self):
+        emb_by_region = emb[node_table["region"] == "Asia"]
+        rog = emlens.radius_of_gyration(emb_by_region, 'euc')
 
 
 if __name__ == "__main__":
