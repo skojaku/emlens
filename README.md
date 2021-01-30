@@ -9,7 +9,7 @@ https://emlens.readthedocs.io/en/latest/
 
 With conda: (change `myenv` to your env name) 
 ```
-conda env update -n myenv --file ENV.yaml
+conda env update -n myenv --file environment.yml
 ```
 
 With pip: 
