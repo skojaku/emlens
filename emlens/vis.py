@@ -50,7 +50,7 @@ def repel_labels(
         txt.set_path_effects([PathEffects.withStroke(linewidth=5, foreground="w")])
         txt_list += [txt]
 
-    if "precision" is not adjust_text_params:
+    if "precision" != adjust_text_params:
         adjust_text_params["precision"] = 0.1
 
     adjust_text(
