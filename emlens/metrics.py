@@ -1,11 +1,7 @@
 import faiss
 import numpy as np
-from joblib import Parallel, delayed
 from scipy import sparse, stats
-from sklearn import utils
-from sklearn.metrics import average_precision_score, roc_curve
 from sklearn.metrics.pairwise import cosine_similarity
-from tqdm import tqdm
 
 
 def make_knn_graph(emb, k=5):
