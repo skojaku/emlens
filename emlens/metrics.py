@@ -1,7 +1,6 @@
 import faiss
 import numpy as np
 from scipy import sparse, stats
-from sklearn.metrics.pairwise import cosine_similarity
 
 
 def make_knn_graph(emb, k=5):
@@ -205,9 +204,13 @@ def radius_of_gyration(emb, distance_function="euc"):
     mean_vec = emb.mean(axis=0)
     if distance_function == "euc":
         diff_emb = emb - mean_vec
-        rog = np.sqrt(np.mean(np.sum(np.power(diff_emb, 2), axis=1)))
+        d = np.sum(np.power(diff_emb, 2), axis=1)
+        rog = np.sqrt(np.mean(d))
     elif distance_function == "cos":
-        rog = np.sqrt(np.mean(np.power(1 - cosine_similarity(emb, [mean_vec]), 2)))
+        mean_vec = mean_vec / np.linalg.norm(mean_vec)
+        emb = (emb.T / np.array(np.linalg.norm(emb, axis=1)).reshape(-1)).T
+        d = 1 - emb @ mean_vec
+        rog = np.sqrt(np.mean(d ** 2))
     else:
         raise NotImplementedError(
             "radious of gyration function does not support distance_function: {}".format(
