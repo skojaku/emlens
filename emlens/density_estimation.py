@@ -4,18 +4,18 @@ from scipy import sparse, special
 
 
 def estimate_pdf(target, emb, C=0.1):
-    """Estimate the density of points at the given target locations in
-    embedding space using the density estimator based on the k-nearest neighbor
-    graph.
+    """Estimate the density of entities at the given target locations in the
+    embedding space using the density estimator based on the k-nearest
+    neighbors.
 
     :param target: Target location at which the density is calculated.
-    :type locations: numpy.array, shape=(num_targets, dim)
-    :param emb: Embedding vectors for the points
-    :type emb: numpy.ndarray, (num_points, dim)
-    :param C: Bandwidth for kernels. Ranges between (0,1]. Roughly C * num_points nearest neighbors will be used for estimating the density at a single target location.
+    :type target: numpy.array, shape=(num_target, dim)
+    :param emb: Embedding vectors for the entities
+    :type emb: numpy.ndarray, (num_entities, dim)
+    :param C: Bandwidth for kernels. Ranges between (0,1]. Roughly C * num_entities nearest neighbors will be used for estimating the density at a single target location.
     :type C: str, optional
     :return: Log-density of points at the target locations.
-    :rtype: numpy.ndarray (num_targets,)
+    :rtype: numpy.ndarray (num_target,)
 
     Reference
     https://faculty.washington.edu/yenchic/18W_425/Lec7_knn_basis.pdf

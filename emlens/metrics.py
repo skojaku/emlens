@@ -4,7 +4,7 @@ from scipy import sparse, stats
 
 
 def make_knn_graph(emb, k=5):
-    """Construct the k-nearest neighbor graph from embedding vectors.
+    """Construct the k-nearest neighbor graph from the embedding vectors.
 
     :param emb: embedding vectors
     :type emb: numpy.ndarray (num_entities, dim)
@@ -35,16 +35,16 @@ def make_knn_graph(emb, k=5):
 
 
 def assortativity(emb, y, A=None, k=5):
-    """Calculate the assortativity of y for close entities in the embedding
+    """Calculate the assortativity of `y` for close entities in the embedding
     space. A positive/negative assortativity indicates that the close entities
-    tend to have a similar/dissimilar y. Zero assortativity means y is
+    tend to have a similar/dissimilar `y`. Zero assortativity means `y` is
     independent of the embedding.
 
     :param emb: embedding vectors
     :type emb: numpy.ndarray (num_entities, dim)
     :param y: feature of y
-    :type y: numpy.ndarray
-    :param A: precomputed adjacency matrix of the graph. If None, a k-nearest neighbor graph will be constructed., defaults to None
+    :type y: numpy.ndarray (num_entities,)
+    :param A: precomputed adjacency matrix of the graph. If None, a k-nearest neighbor graph will be constructed, defaults to None
     :type A: scipy.csr_matrix, optional
     :param k: Number of the nearest neighbors, defaults to 5
     :type k: int, optional
@@ -72,17 +72,18 @@ def assortativity(emb, y, A=None, k=5):
     return stats.pearsonr(y[r], y[c])[0]
 
 
-def modularity(emb, g, A=None, k=5):
-    """Calculate the modularity of entities with group membership g. The
+def modularity(emb, group_ids, A=None, k=5):
+    """Calculate the modularity of entities with group membership. The
     modularity ranges between [-1,1], where a positive modularity indicates
     that nodes with the same group membership tend to be close each other. Zero
-    modularity means that membership g is independent of the embedding.
+    modularity means that membership `group_ids` is independent of the
+    embedding.
 
     :param emb: embedding vectors
     :type emb: numpy.ndarray (num_entities, dim)
-    :param g: group membership for entities
-    :type g: numpy.ndarray
-    :param A: precomputed adjacency matrix of the graph. If None, a k-nearest neighbor graph will be constructed., defaults to None
+    :param group_ids: group membership for entities
+    :type group_ids: numpy.ndarray (num_entities, )
+    :param A: precomputed adjacency matrix of the graph. If None, a k-nearest neighbor graph will be constructed, defaults to None
     :type A: scipy.csr_matrix, optional
     :param k: Number of the nearest neighbors, defaults to 5
     :type k: int, optional
@@ -104,7 +105,7 @@ def modularity(emb, g, A=None, k=5):
     r, c, v = sparse.find(A)
 
     deg = np.array(A.sum(axis=0))
-    labels, gids = np.unique(g, return_inverse=True)
+    labels, gids = np.unique(group_ids, return_inverse=True)
     U = sparse.csr_matrix(
         (np.ones_like(gids), (np.arange(gids.size), gids)),
         shape=(gids.size, len(labels)),
@@ -114,19 +115,21 @@ def modularity(emb, g, A=None, k=5):
     return Q
 
 
-def pairwise_dot_sim(emb, g):
-    """Average dot similarity between entities in groups.
+def pairwise_dot_sim(emb, group_ids):
+    """Pairwise distance between groups. The dot similarity between two groups
+    i and j is calculated by averaging the dot similarity of entities in group
+    i and those in group j.
 
     :param emb: embedding vectors
     :type emb: numpy.ndarray (num_entities, dim)
-    :param g: group membership
-    :type g: numpy.ndarray (num_entities)
+    :param group_ids: group membership
+    :type group_ids: numpy.ndarray (num_entities)
     :return: S, groups
     :rtype: numpy.ndarray, numpy.ndarray
 
-        * **D**: Distance matrix for groups.
+        * **S** (numpy.ndarray (num_groups, num_groups)): Similarity matrix for groups.
 
-        * **groups**:  group[i] is the group for the ith row/column of D.
+        * **groups** (numpy.ndarray (num_groups])):  group[i] is the group for the ith row/column of S.
 
     .. highlight:: python
     .. code-block:: python
@@ -135,11 +138,11 @@ def pairwise_dot_sim(emb, g):
         >>> import numpy as np
         >>> import seaborn as sns
         >>> emb = np.random.randn(100, 20)
-        >>> g = np.random.choice(10, 100)
-        >>> S, groups = emlens.pairwise_dot_sim(emb, g)
+        >>> group_ids = np.random.choice(10, 100)
+        >>> S, groups = emlens.pairwise_dot_sim(emb, group_ids)
         >>> sns.heatmap(pd.DataFrame(S, index = groups, columns = groups))
     """
-    groups, gids = np.unique(g, return_inverse=True)
+    groups, gids = np.unique(group_ids, return_inverse=True)
 
     U = sparse.csr_matrix(
         (np.ones_like(gids), (np.arange(gids.size), gids)),
@@ -152,20 +155,20 @@ def pairwise_dot_sim(emb, g):
     return S, groups
 
 
-def pairwise_distance(emb, g):
-    """Pairwise distance between groups. The distance between two groups is the
-    distance between the centroid of the groups.
+def pairwise_distance(emb, group_ids):
+    """Pairwise distance between the centroid of groups. The centroid of a
+    group is the average embedding vectors of the entities in the group.
 
     :param emb: embedding
-    :type emb: numpy.ndarray
-    :param g: group membership
-    :type g: numpy.ndarray (num_entities)
+    :type emb: numpy.ndarray (num_entities, dim)
+    :param group_ids: group membership
+    :type group_ids: numpy.ndarray (num_entities)
     :return: D, groups
     :rtype: numpy.ndarray, numpy.ndarray
 
-        * **D**: Distance matrix for groups.
+        * **D** (numpy.ndarray (num_groups, num_groups)): Distance matrix for groups.
 
-        * **groups**:  group[i] is the group for the ith row/column of D.
+        * **groups** (numpy.ndarray (num_groups])): group[i] is the group for the ith row/column of D.
 
     .. highlight:: python
     .. code-block:: python
@@ -174,11 +177,11 @@ def pairwise_distance(emb, g):
         >>> import numpy as np
         >>> import seaborn as sns
         >>> emb = np.random.randn(100, 20)
-        >>> g = np.random.choice(10, 100)
-        >>> S, groups = emlens.pairwise_distance(emb, g)
-        >>> sns.heatmap(pd.DataFrame(S, index = groups, columns = groups))
+        >>> group_ids = np.random.choice(10, 100)
+        >>> D, groups = emlens.pairwise_distance(emb, group_ids)
+        >>> sns.heatmap(pd.DataFrame(D, index = groups, columns = groups))
     """
-    groups, gids = np.unique(g, return_inverse=True)
+    groups, gids = np.unique(group_ids, return_inverse=True)
     U = sparse.csr_matrix(
         (np.ones_like(gids), (np.arange(gids.size), gids)),
         shape=(emb.shape[0], len(groups)),

@@ -8,9 +8,9 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 
 class SemAxis:
-    """SemAxis.
+    """SemAxis Class object.
 
-    A SemAxis is an axis going through two entity groups in the embedding space [1].
+    SemAxis is a simple approach to capture a continuous spectrum between two entity groups in the embedding space.
 
     Reference:
 
@@ -22,7 +22,7 @@ class SemAxis:
         >>> import emlens
         >>> import numpy as np
         >>> emb = np.random.randn(100, 20) # Embedding vectors to ground the SemAxis
-        >>> group_ids = np.random.choice(2, 100) # Membership of entities
+        >>> group_ids = np.random.choice(2, 100) # Group membership of entities
         >>> target = np.random.randn(10, 20) # Vectors we will project onto the SemAxis
         >>> model = emlens.SemAxis() # load SemAxis Object
         >>> model.fit(emb, group_ids) # Fit the SemAxis
@@ -43,8 +43,9 @@ class SemAxis:
 
         :param emb: embedding vectors for locating the SemAxis
         :type emb: numpy.ndarray (num_entities, dim)
-        :param group_ids: group_ids.
-        :type group_ids: numpy.ndarray (num_entities, dim), defaults to None.
+        :param group_ids: group_ids, defaults to None.
+        :type group_ids: numpy.ndarray (num_entities, dim)
+        :param group_order: The axis points from group_order[0] to group_order[1]
         :type group_order: list, optional
         """
         if group_order is None:
@@ -97,8 +98,9 @@ class SemAxis:
             >>> import emlens
             >>> import numpy as np
             >>> emb = np.random.randn(100, 20)
-            >>> group_ids = np.random.choice(100, 10)
-            >>> emlens.saveSemAxis('semspace.sm')
+            >>> group_ids = np.random.choice(2, 100)
+            >>> model = emlens.SemAxis().fit(emb, group_ids)
+            >>> model.save('semspace.sm')
         """
         if os.path.exists(filename):
             shutil.rmtree(filename)
@@ -108,7 +110,7 @@ class SemAxis:
         param_filename = "{dir_name}/param.json".format(dir_name=filename)
 
         np.savez(
-            emb_filename, emb=self.emb, group_ids=self._group_ids, semaxis=self.semaxis
+            emb_filename, emb=self.emb, _group_ids=self._group_ids, semaxis=self.semaxis
         )
 
         params = {"n_group": self.n_group, "group_order": self.group_order}
@@ -116,7 +118,7 @@ class SemAxis:
             json.dump(params, f)
 
     def load(self, filename):
-        """Load a saved SemAxis file.
+        """Load SemAxis file.
 
         :param filename: filename
         :type filename: str
@@ -125,7 +127,7 @@ class SemAxis:
         .. code-block:: python
 
             >>> import emlens
-            >>> xy = emlens.SemAxis_from_file('semspace', emb)
+            >>> xy = emlens.SemAxis().load('semspace.sm')
         """
         emb_filename = "{dir_name}/emb.npz".format(dir_name=filename)
         param_filename = "{dir_name}/param.json".format(dir_name=filename)
@@ -140,12 +142,13 @@ class SemAxis:
 
         for k, v in params.items():
             setattr(self, k, v)
+        return self
 
 
 class LDASemAxis(SemAxis):
     """SemAxis based on Linear Discriminant Analysis.
 
-    A variant of SemAxis that finds the axis based on the Linear Discriminat Analysis (LDA). This LDA-based SemAxis separates the two groups more than the original SemAxis approach. Furtheremore, the variant can find a "space" that best separates the groups.
+    A variant of SemAxis that finds the axis based on Linear Discriminant Analysis (LDA). This LDA-based SemAxis separates the given two groups more than the original SemAxis approach. The LDA-based SemAxis can find a "space" that best separates the groups.
     See https://en.wikipedia.org/wiki/Linear_discriminant_analysis.
 
 
@@ -161,7 +164,8 @@ class LDASemAxis(SemAxis):
         >>> model.fit(emb, group_ids) # Fit the SemAxis
         >>> model.transform(target, dim = 1) # Project `target` to the axis
         >>> model.transform(target, dim = 2) # Project `target` to a 2D space
-        >>> model.save("random-semaxis.sm")
+        >>> model.save("random-semaxis.sm") # Save fitted SemAxis object
+        >>> model = emlens.LDASemAxis().load("random-semaxis.sm") # Load fitted SemAxis object
     """
 
     def __init__(self, **params):
@@ -179,7 +183,7 @@ class LDASemAxis(SemAxis):
         :param dim: dimension for the projected space, defaults to 1
         :type dim: int, optional
         :return: Projected embedding vectors.
-        :rtype: numpy.ndarray (num_data,)
+        :rtype: numpy.ndarray (num_data,dim)
         """
         lda = LinearDiscriminantAnalysis(n_components=dim, **params)
         lda.fit(self.emb, self._group_ids)
