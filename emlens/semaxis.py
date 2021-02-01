@@ -10,7 +10,8 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 class SemAxis:
     """SemAxis Class object.
 
-    SemAxis is a simple approach to capture a continuous spectrum between two entity groups in the embedding space.
+    SemAxis aims to find an interpretable axis in the emebeding spacing using acronym entity groups.
+    The axis is placed such that it runs through the centeroid of two acronym entity groups, and then all entities are projected to the axis.
 
     Reference:
 
