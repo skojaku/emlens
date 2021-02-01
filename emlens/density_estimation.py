@@ -3,18 +3,19 @@ import numpy as np
 from scipy import sparse, special
 
 
-def estimate_pdf(locations, emb, C0=0.1):
-    """Estimate the density of points at given locations in embedding space
-    using the KNN desity estimator.
+def estimate_pdf(target, emb, C=0.1):
+    """Estimate the density of points at the given target locations in
+    embedding space using the density estimator based on the k-nearest neighbor
+    graph.
 
-    :param locations: Location at which the density is calculated.
-    :type locations: numpy.array, shape=(num_locations, dim)
-    :param emb: Embedding vectors of points
-    :type emb: numpy.ndarray, (num_point, dim)
-    :param C: Parameter for band width. Roughly C * emb.shape[0] nearest neighbors will be used for density estimation.
+    :param target: Target location at which the density is calculated.
+    :type locations: numpy.array, shape=(num_targets, dim)
+    :param emb: Embedding vectors for the points
+    :type emb: numpy.ndarray, (num_points, dim)
+    :param C: Bandwidth for kernels. Ranges between (0,1]. Roughly C * num_points nearest neighbors will be used for estimating the density at a single target location.
     :type C: str, optional
-    :return: Density of points given by `emb` at `locations`.
-    :rtype: numpy.ndarray (num_locations,)
+    :return: Log-density of points at the target locations.
+    :rtype: numpy.ndarray (num_targets,)
 
     Reference
     https://faculty.washington.edu/yenchic/18W_425/Lec7_knn_basis.pdf
@@ -25,16 +26,17 @@ def estimate_pdf(locations, emb, C0=0.1):
         >>> import emlens
         >>> import numpy as np
         >>> emb = np.random.randn(100, 20)
-        >>> density = emlens.make_knn_graph(locations=emb, emb = emb)
+        >>> target = np.random.randn(10, 20)
+        >>> density = emlens.make_knn_graph(target=target, emb = emb)
     """
     n = emb.shape[0]
     dim = emb.shape[1]
-    k = int(np.round(C0 * np.power(n, 4 / 5)))
+    k = int(np.round(C * np.power(n, 4 / 5)))
 
     # Construct the knn graph
     index = faiss.IndexFlatL2(dim)
     index.add(emb.astype(np.float32))
-    distances, indices = index.search(locations.astype(np.float32), k=k)
+    distances, indices = index.search(target.astype(np.float32), k=k)
 
     #
     # KNN density estimator
