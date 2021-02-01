@@ -20,6 +20,8 @@ class TestCalc(unittest.TestCase):
         model.fit(self.emb, self.membership)
         model.transform(self.emb)
         model.save("random-semaxis.sm")
+        model = emlens.LDASemAxis().load("random-semaxis.sm")
+        model.transform(self.emb)
         shutil.rmtree("random-semaxis.sm")
 
     def test_lda_semaxis(self):
