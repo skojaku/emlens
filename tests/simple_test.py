@@ -1,3 +1,4 @@
+import shutil
 import unittest
 
 import numpy as np
@@ -15,16 +16,18 @@ class TestCalc(unittest.TestCase):
         self.K = len(set(self.membership))
 
     def test_semaxis(self):
-        for mode in ["fda", "lda"]:
-            xy = emlens.SemAxis(
-                vec=self.emb,
-                class_vec=self.emb,
-                labels=self.membership,
-                dim=2,
-                mode=mode,
-            )
-            self.assertEqual(xy.shape[0], self.emb.shape[0])
-            self.assertEqual(xy.shape[1], 2)
+        model = emlens.SemAxis()
+        model.fit(self.emb, self.membership)
+        model.transform(self.emb)
+        model.save("random-semaxis.sm")
+        shutil.rmtree("random-semaxis.sm")
+
+    def test_lda_semaxis(self):
+        model = emlens.LDASemAxis()
+        model.fit(self.emb, self.membership)
+        model.transform(self.emb)
+        model.save("random-semaxis.sm")
+        shutil.rmtree("random-semaxis.sm")
 
     def test_assortativity(self):
         emlens.assortativity(self.emb, self.deg)
@@ -41,7 +44,7 @@ class TestCalc(unittest.TestCase):
         self.assertEqual(S.shape[1], self.K)
 
     def test_estimate_pdf(self):
-        emlens.estimate_pdf(locations=self.emb, emb=self.emb)
+        emlens.estimate_pdf(target=self.emb, emb=self.emb, C=0.1)
 
     def calculate_rog(self):
         emlens.radius_of_gyration(self.emb, "euc")
