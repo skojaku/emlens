@@ -4,13 +4,13 @@ from scipy import sparse, stats
 
 
 def make_knn_graph(emb, k=5):
-    """Construct the kNN graph.
+    """Construct the k-nearest neighbor graph from embedding vectors.
 
     :param emb: embedding vectors
     :type emb: numpy.ndarray (num_entities, dim)
-    :param k: Number of neighbors, defaults to 5
+    :param k: Number of nearest neighbors, defaults to 5
     :type k: int, optional
-    :return: KNN graph
+    :return: The adjacency matrix of the k-nearest neighbor graph
     :rtype: sparse.csr_matrix
 
     .. highlight:: python
@@ -35,18 +35,21 @@ def make_knn_graph(emb, k=5):
 
 
 def assortativity(emb, y, A=None, k=5):
-    """Calculate the assortativity for a KNN graph constructed based on the.
+    """Calculate the assortativity of y for close entities in the embedding
+    space. A positive/negative assortativity indicates that the close entities
+    tend to have a similar/dissimilar y. Zero assortativity means y is
+    independent of the embedding.
 
     :param emb: embedding vectors
     :type emb: numpy.ndarray (num_entities, dim)
-    :param y: labels for entities
-    :type y: nuimpy.ndarray or list
-    :param A: precomputed graph, defaults to None
+    :param y: feature of y
+    :type y: numpy.ndarray
+    :param A: precomputed adjacency matrix of the graph. If None, a k-nearest neighbor graph will be constructed., defaults to None
     :type A: scipy.csr_matrix, optional
-    :param k: Number of neighbors, defaults to 5
+    :param k: Number of the nearest neighbors, defaults to 5
     :type k: int, optional
-    :return: assortativity index
-    :rtype: sparse.csr_matrix
+    :return: assortativity
+    :rtype: float
 
     .. highlight:: python
     .. code-block:: python
@@ -56,6 +59,10 @@ def assortativity(emb, y, A=None, k=5):
         >>> emb = np.random.randn(100, 20)
         >>> y = np.random.randn(emb.shape[0])
         >>> rho = emlens.assortativity(emb, y)
+
+    .. note::
+        To calculate the assortativity, a k-nearest neighbor graph is constructed.
+        Then, the assortativity is calculated as the Pearson correlation of y between the adjacent nodes.
     """
 
     if A is None:
@@ -65,19 +72,22 @@ def assortativity(emb, y, A=None, k=5):
     return stats.pearsonr(y[r], y[c])[0]
 
 
-def modularity(emb, y, A=None, k=5):
-    """Calculate the assortativity for a KNN graph constructed based on the.
+def modularity(emb, g, A=None, k=5):
+    """Calculate the modularity of entities with group membership g. The
+    modularity ranges between [-1,1], where a positive modularity indicates
+    that nodes with the same group membership tend to be close each other. Zero
+    modularity means that membership g is independent of the embedding.
 
     :param emb: embedding vectors
     :type emb: numpy.ndarray (num_entities, dim)
-    :param y: labels for entities
-    :type y: nuimpy.ndarray or list
-    :param A: precomputed graph, defaults to None
+    :param g: group membership for entities
+    :type g: numpy.ndarray
+    :param A: precomputed adjacency matrix of the graph. If None, a k-nearest neighbor graph will be constructed., defaults to None
     :type A: scipy.csr_matrix, optional
-    :param k: Number of neighbors, defaults to 5
+    :param k: Number of the nearest neighbors, defaults to 5
     :type k: int, optional
-    :return: assortativity index
-    :rtype: sparse.csr_matrix
+    :return: modularity
+    :rtype: float
 
     .. highlight:: python
     .. code-block:: python
@@ -85,8 +95,8 @@ def modularity(emb, y, A=None, k=5):
         >>> import emlens
         >>> import numpy as np
         >>> emb = np.random.randn(100, 20)
-        >>> y = np.random.choice(10, 100)
-        >>> rho = emlens.modularity(emb, y)
+        >>> g = np.random.choice(10, 100)
+        >>> rho = emlens.modularity(emb, g)
     """
 
     if A is None:
@@ -94,27 +104,29 @@ def modularity(emb, y, A=None, k=5):
     r, c, v = sparse.find(A)
 
     deg = np.array(A.sum(axis=0))
-    labels, yids = np.unique(y, return_inverse=True)
+    labels, gids = np.unique(g, return_inverse=True)
     U = sparse.csr_matrix(
-        (np.ones_like(yids), (np.arange(yids.size), yids)),
-        shape=(yids.size, len(labels)),
+        (np.ones_like(gids), (np.arange(gids.size), gids)),
+        shape=(gids.size, len(labels)),
     )
     D = np.array(deg.reshape(1, -1) @ U).reshape(-1)
     Q = np.trace((U.T @ A @ U) - np.outer(D, D) / np.sum(D)) / np.sum(D)
     return Q
 
 
-def pairwise_dot_sim(emb, y):
-    """Pairwise dot similarity between groups. The dot similarity between two
-    groups is computed by averaging over the dot similarity between entities in
-    the groups.
+def pairwise_dot_sim(emb, g):
+    """Average dot similarity between entities in groups.
 
-    :param emb: embedding
-    :type emb: numpy.ndarray
-    :param y: group index
-    :type y: numpy.ndarray or list
-    :return: Similarity matrix S, and labels for groups
+    :param emb: embedding vectors
+    :type emb: numpy.ndarray (num_entities, dim)
+    :param g: group membership
+    :type g: numpy.ndarray (num_entities)
+    :return: S, groups
     :rtype: numpy.ndarray, numpy.ndarray
+
+        * **D**: Distance matrix for groups.
+
+        * **groups**:  group[i] is the group for the ith row/column of D.
 
     .. highlight:: python
     .. code-block:: python
@@ -123,33 +135,37 @@ def pairwise_dot_sim(emb, y):
         >>> import numpy as np
         >>> import seaborn as sns
         >>> emb = np.random.randn(100, 20)
-        >>> y = np.random.choice(10, 100)
-        >>> S, labels = emlens.pairwise_dot_sim(emb, y)
-        >>> sns.heatmap(pd.DataFrame(S, index = labels, columns = labels))
+        >>> g = np.random.choice(10, 100)
+        >>> S, groups = emlens.pairwise_dot_sim(emb, g)
+        >>> sns.heatmap(pd.DataFrame(S, index = groups, columns = groups))
     """
-    labels, yids = np.unique(y, return_inverse=True)
+    groups, gids = np.unique(g, return_inverse=True)
 
     U = sparse.csr_matrix(
-        (np.ones_like(yids), (np.arange(yids.size), yids)),
-        shape=(emb.shape[0], len(labels)),
+        (np.ones_like(gids), (np.arange(gids.size), gids)),
+        shape=(emb.shape[0], len(groups)),
     )
     U = U @ sparse.diags(1 / np.maximum(1, np.array(U.sum(axis=0)).reshape(-1)))
 
     Uemb = U.T @ emb
     S = Uemb @ Uemb.T
-    return S, labels
+    return S, groups
 
 
-def pairwise_distance(emb, y):
+def pairwise_distance(emb, g):
     """Pairwise distance between groups. The distance between two groups is the
     distance between the centroid of the groups.
 
     :param emb: embedding
     :type emb: numpy.ndarray
-    :param y: group index
-    :type y: numpy.ndarray or list
-    :return: Distance matrix D, and labels for groups
+    :param g: group membership
+    :type g: numpy.ndarray (num_entities)
+    :return: D, groups
     :rtype: numpy.ndarray, numpy.ndarray
+
+        * **D**: Distance matrix for groups.
+
+        * **groups**:  group[i] is the group for the ith row/column of D.
 
     .. highlight:: python
     .. code-block:: python
@@ -158,14 +174,14 @@ def pairwise_distance(emb, y):
         >>> import numpy as np
         >>> import seaborn as sns
         >>> emb = np.random.randn(100, 20)
-        >>> y = np.random.choice(10, 100)
-        >>> S, labels = emlens.pairwise_distance(emb, y)
-        >>> sns.heatmap(pd.DataFrame(S, index = labels, columns = labels))
+        >>> g = np.random.choice(10, 100)
+        >>> S, groups = emlens.pairwise_distance(emb, g)
+        >>> sns.heatmap(pd.DataFrame(S, index = groups, columns = groups))
     """
-    labels, yids = np.unique(y, return_inverse=True)
+    groups, gids = np.unique(g, return_inverse=True)
     U = sparse.csr_matrix(
-        (np.ones_like(yids), (np.arange(yids.size), yids)),
-        shape=(emb.shape[0], len(labels)),
+        (np.ones_like(gids), (np.arange(gids.size), gids)),
+        shape=(emb.shape[0], len(groups)),
     )
     U = U @ sparse.diags(1 / np.maximum(1, np.array(U.sum(axis=0)).reshape(-1)))
     Uemb = U.T @ emb
@@ -177,18 +193,20 @@ def pairwise_distance(emb, y):
                 d = np.sqrt(np.sum((Uemb[ll, :] - Uemb[k, :]) ** 2))
                 D[k, ll] = d
                 D[ll, k] = d
-    return D, labels
+    return D, groups
 
 
-def radius_of_gyration(emb, distance_function="euc"):
-    """Calculate the radius of gyration -- atypicalness for sets of embedding
-    vectors For the detail, please read
+def rog(emb, center=None, metric="euc"):
+    """Calculate the radius of gyration (ROG) for the embedding vectors. The
+    ROG is a standard deviation of distance of points from a center point. See
     https://en.wikipedia.org/wiki/Radius_of_gyration.
 
     :param emb: embedding vector (num_entities, dim)
     :type emb: numpy.ndarray
-    :param distance_function: only cosine distance ('cos') and eucliduan distance ('euc') are supported.
-    :type distance_function: str
+    :param metric: The metric for the distance between points. The available metrics are cosine ('cos') euclidean ('euc') distances.
+    :type metric: str
+    :param center: The embedding vector for the center location. If None, the centroid of the given embedding vectors is used as the center., defaults to None
+    :type center: numpy.ndarray (num_entities, 1)
     :return: ROG value
     :rtype: float
 
@@ -198,24 +216,20 @@ def radius_of_gyration(emb, distance_function="euc"):
         >>> import emlens
         >>> import numpy as np
         >>> emb = np.random.randn(100, 20)
-        >>> rog = emlens.pairwise_distance(emb, 'cos')
+        >>> rog = emlens.pairwise_metric(emb, 'cos')
     """
 
-    mean_vec = emb.mean(axis=0)
-    if distance_function == "euc":
-        diff_emb = emb - mean_vec
-        d = np.sum(np.power(diff_emb, 2), axis=1)
+    if center is None:
+        center = emb.mean(axis=0)
+
+    if metric == "euc":
+        d = np.sum(np.power(emb - center, 2), axis=1)
         rog = np.sqrt(np.mean(d))
-    elif distance_function == "cos":
-        mean_vec = mean_vec / np.linalg.norm(mean_vec)
+    elif metric == "cos":
+        center = center / np.linalg.norm(center)
         emb = (emb.T / np.array(np.linalg.norm(emb, axis=1)).reshape(-1)).T
-        d = 1 - emb @ mean_vec
+        d = 1 - emb @ center
         rog = np.sqrt(np.mean(d ** 2))
     else:
-        raise NotImplementedError(
-            "radious of gyration function does not support distance_function: {}".format(
-                distance_function
-            )
-        )
-
+        raise NotImplementedError("rog does not support metric: {}".format(metric))
     return rog
