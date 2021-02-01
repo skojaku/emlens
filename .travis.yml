@@ -14,4 +14,4 @@ install:
 
 # command to run tests
 script:
-  - python -m unittest tests/apitest.py
+  - python -m unittest tests/simple_test.py
