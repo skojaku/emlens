@@ -7,12 +7,12 @@ https://emlens.readthedocs.io/en/latest/
 
 ## Install
 
-With conda: (change `myenv` to your env name) 
+With conda: (change `myenv` to your env name)
 ```
-conda env update -n myenv --file ENV.yaml
+conda env update -n myenv --file environment.yml
 ```
 
-With pip: 
+With pip:
 ```
 pip install -r requirements.txt .
 ```
@@ -29,8 +29,5 @@ Docsctring: sphinx format
 
 Test:
 ```bash
-python -m unittest tests/apitest.py
+python -m unittest tests/simple_test.py
 ```
-
-
-

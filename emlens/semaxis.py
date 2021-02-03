@@ -3,264 +3,191 @@ import os
 import shutil
 
 import numpy as np
-import scipy
 from scipy import sparse
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 
-def SemAxis(
-    vec,
-    class_vec,
-    labels,
-    label_order=None,
-    dim=1,
-    mode="fda",
-    centering=True,
-    return_class_vec=False,
-    **params
-):
-    """SemAxis.
+class SemAxis:
+    """SemAxis Class object.
 
-    :param vec: embedding vectors
-    :type vec: numpy.ndarray (num_entities, dim)
-    :param class_vec: labeled vectors
-    :type class_vec: numpy.ndarray (num_labeled_entities, dim)
-    :param labels: labels
-    :type labels: numpy.ndarray(num_labeled_entities, dim)
-    :param label_order: label order, defaults to None
-    :type label_order: list, optional
-    :param dim: reduced dimension, defaults to 1
-    :type dim: int, optional
-    :param mode: projection method. mode="semaxis", "lda", "fda" are supported, defaults to "fda"
-    :type mode: str, optional
-    :param centering: center the projected space, defaults to True
-    :type centering: bool, optional
-    :param return_class_vec: whether to return the projected labeled vector, defaults to False
-    :type return_class_vec: bool, optional
-    :return: retvec, class_vec, labels 
+    SemAxis aims to find an interpretable axis in the emebeding spacing using acronym entity groups.
+    The axis is placed such that it runs through the centeroid of two acronym entity groups, and then all entities are projected to the axis.
 
-        * **retvec**: The vectors for the data points projected onto semaxis (or semspace).
-            
-        * **class_vec**: The projection of vectors used to construct the axis (or space). This variable is returned only when return_class_vec=True.
-            
-        * **labels**: The class labels for vectors used to construct the axis (or space). This variable is returned only when return_class_vec=True.
-    :rtype: numpy.ndarray (num_data, dim), numpy.ndarray (num_data_with_labels, dim), numpy.ndarray (num_data_with_labels, ) 
+    Reference:
+
+        * [1] An, J., Kwak, H., & Ahn, Y.-Y. (2018). SemAxis: A Lightweight Framework to Characterize Domain-Specific Word Semantics Beyond Sentiment. Proc. the 56th Annual Meeting of the Association for Computational Linguistics, 1, 2450–2461.
 
     .. highlight:: python
     .. code-block:: python
 
         >>> import emlens
         >>> import numpy as np
-        >>> emb = np.random.randn(100, 20)
-        >>> labels = np.random.choice(100, 10)
-        >>> xy = emlens.SemAxis(vec = emb, class_vec = emb, labels = labels, dim=2, mode = "fda")
+        >>> emb = np.random.randn(100, 20) # Embedding vectors to ground the SemAxis
+        >>> group_ids = np.random.choice(2, 100) # Group membership of entities
+        >>> target = np.random.randn(10, 20) # Vectors we will project onto the SemAxis
+        >>> model = emlens.SemAxis() # load SemAxis Object
+        >>> model.fit(emb, group_ids) # Fit the SemAxis
+        >>> model.transform(target) # Project `target` to the axis
+        >>> model.save("random-semaxis.sm")
     """
 
-    def calc_mean_vec(vec, s=None):
-        if s is None:
-            return np.mean(vec, axis=0) if vec.shape[1] > 1 else np.mean(vec)
+    def __init__(self):
+        self.emb = None
+        self.prj_emb = None
+        self.semaxis = None
+
+        # private
+        self._group_ids = None  # int ids of group membership
+
+    def fit(self, emb, group_ids, group_order=None):
+        """Finding the SemAxis from embedding vectors.
+
+        :param emb: embedding vectors for locating the SemAxis
+        :type emb: numpy.ndarray (num_entities, dim)
+        :param group_ids: group_ids, defaults to None.
+        :type group_ids: numpy.ndarray (num_entities, dim)
+        :param group_order: The axis points from group_order[0] to group_order[1]
+        :type group_order: list, optional
+        """
+        if group_order is None:
+            self.group_order, self._group_ids = np.unique(
+                group_ids, return_inverse=True
+            )
+            self.group_order = self.group_order.tolist()
+            self.n_group = len(self.group_order)
         else:
-            return np.mean(vec[s, :], axis=0) if vec.shape[1] > 1 else np.mean(vec[s])
+            self.group_order = group_order
+            group2cids = {ll: i for i, ll in enumerate(self.group_order)}
+            self._group_ids = np.array([group2cids[ll] for ll in group_ids])
+            self.n_group = len(group2cids)
+        self.emb = emb
+        return self
 
-    if label_order is None:
-        class_labels, class_ids = np.unique(labels, return_inverse=True)
-        n_class = len(class_labels)
-    else:
-        label2cids = {ll: i for i, ll in enumerate(label_order)}
-        class_ids = np.array([label2cids[ll] for ll in labels])
-        n_class = len(label2cids)
+    def transform(self, target):
+        """Project the target vectors onto SemAxis.
 
-    if mode == "semaxis":
-        left_center = np.mean(class_vec[class_ids == 0, :], axis=0)
-        right_center = np.mean(class_vec[class_ids == 1, :], axis=0)
-        vr = right_center - left_center
-        denom = np.linalg.norm(vec, axis=1) * np.linalg.norm(vr)
+        :param target: target embedding vectors to project onto the SemAxis.
+        :type target: numpy.ndarray (num_target, dim)
+        :return: Projected embedding vectors.
+        :rtype: numpy.ndarray (num_data,)
+        """
+        left_center = np.mean(self.emb[self._group_ids == 0, :], axis=0)
+        right_center = np.mean(self.emb[self._group_ids == 1, :], axis=0)
+        semaxis = right_center - left_center
+
+        denom = np.linalg.norm(target, axis=1) * np.linalg.norm(semaxis)
         denom = 1 / np.maximum(denom, 1e-20)
-        ret_vec = sparse.diags(denom) @ (vec @ vr.T)
+        prj_target = sparse.diags(denom) @ (target @ semaxis.T)
 
-        denom = np.linalg.norm(class_vec, axis=1) * np.linalg.norm(vr)
+        denom = np.linalg.norm(self.emb, axis=1) * np.linalg.norm(semaxis)
         denom = 1 / np.maximum(denom, 1e-20)
-        prj_class_vec = sparse.diags(denom) @ (class_vec @ vr.T)
-    elif mode == "lda":
-        lda = LinearDiscriminantAnalysis(n_components=dim, **params)
-        lda.fit(class_vec, class_ids)
-        ret_vec = lda.transform(vec)
-        prj_class_vec = lda.transform(class_vec)
-    elif mode == "fda":
-        ret_vec, prj_class_vec = fisher_linear_discriminant(
-            vec, class_vec, class_ids, dim, return_class_vec=True, **params
+        self.prj_emb = sparse.diags(denom) @ (self.emb @ semaxis.T)
+
+        self.semaxis = semaxis
+
+        return prj_target
+
+    def save(self, filename):
+        """Save the fitted axis.
+
+        :param filename: name of file
+        :type filename: str
+
+        .. highlight:: python
+        .. code-block:: python
+
+            >>> import emlens
+            >>> import numpy as np
+            >>> emb = np.random.randn(100, 20)
+            >>> group_ids = np.random.choice(2, 100)
+            >>> model = emlens.SemAxis().fit(emb, group_ids)
+            >>> model.save('semspace.sm')
+        """
+        if os.path.exists(filename):
+            shutil.rmtree(filename)
+        os.mkdir(filename)
+
+        emb_filename = "{dir_name}/emb.npz".format(dir_name=filename)
+        param_filename = "{dir_name}/param.json".format(dir_name=filename)
+
+        np.savez(
+            emb_filename, emb=self.emb, _group_ids=self._group_ids, semaxis=self.semaxis
         )
 
-    if centering:
-        class_centers = np.zeros((n_class, dim))
-        for cid in range(n_class):
-            class_centers[cid, :] = calc_mean_vec(prj_class_vec, class_ids == cid)
-        ret_vec -= calc_mean_vec(class_centers)
-        prj_class_vec -= calc_mean_vec(class_centers)
+        params = {"n_group": self.n_group, "group_order": self.group_order}
+        with open(param_filename, "w") as f:
+            json.dump(params, f)
 
-    if return_class_vec:
-        return ret_vec, prj_class_vec, labels
-    else:
-        return ret_vec
+    def load(self, filename):
+        """Load SemAxis file.
 
+        :param filename: filename
+        :type filename: str
 
-def fisher_linear_discriminant(
-    vec,
-    class_vec,
-    class_labels,
-    dim,
-    priors="data",
-    shrinkage=0,
-    return_class_vec=False,
-):
-    """Fisher's linear discriminant analysis.
+        .. highlight:: python
+        .. code-block:: python
 
-    :param vec: embedding vectors
-    :type vec: numpy.ndarray (num_entities, dim)
-    :param class_vec: labeled vectors
-    :type class_vec: numpy.ndarray (num_labeled_entities, dim)
-    :param class_labels: labels
-    :type class_labels: numpy.ndarray(num_labeled_entities, dim)
-    :param dim: dimension
-    :type dim: int
-    :param priors: prior distribution for data, defaults to "data"
-    :type priors: str, optional
-    :param shrinkage: shrinkage strength, defaults to 0
-    :type shrinkage: int, optional
-    :param return_class_vec: whether to return the projected labeled entities, defaults to False
-    :type return_class_vec: bool, optional
-    :return: retvec, class_vec, labels 
+            >>> import emlens
+            >>> xy = emlens.SemAxis().load('semspace.sm')
+        """
+        emb_filename = "{dir_name}/emb.npz".format(dir_name=filename)
+        param_filename = "{dir_name}/param.json".format(dir_name=filename)
 
-        * **retvec**: The vectors for the data points projected onto semaxis (or semspace).
-            
-        * **class_vec**: The projection of vectors used to construct the axis (or space). This variable is returned only when return_class_vec=True.
-            
-        * **labels**: The class labels for vectors used to construct the axis (or space). This variable is returned only when return_class_vec=True.
-    :rtype: numpy.ndarray (num_data, dim), numpy.ndarray (num_data_with_labels, dim), numpy.ndarray (num_data_with_labels, ) 
-    """
+        data = np.load(emb_filename, allow_pickle=True)
+        self.emb = data["emb"]
+        self.semaxis = data["semaxis"]
+        self._group_ids = data["_group_ids"]
 
-    labels, group_ids = np.unique(class_labels, return_inverse=True)
+        with open(param_filename, "r") as f:
+            params = json.load(f)
 
-    K = len(labels)
-    DIM = vec.shape[1]
-
-    class_weight = np.zeros(K)
-    if isinstance(priors, dict):
-        for k, lab in enumerate(labels):
-            class_weight[k] = priors[lab]
-    elif priors == "data":
-        for k, _ in enumerate(labels):
-            class_weight[k] = sum(group_ids == k)
-    elif priors == "uniform":
-        for k, _ in enumerate(labels):
-            class_weight[k] = 1
-
-    class_weight = class_weight / np.sum(class_weight)
-
-    Cw = np.zeros((DIM, DIM))  # Within-class variance
-    MU = np.zeros((K, DIM))  # Mean for each class
-    for k in range(K):
-        v_k = class_vec[group_ids == k, :]
-        mu_k = np.mean(v_k, axis=0)
-        MU[k, :] = mu_k
-
-        if v_k.shape[0] == 1:
-            continue
-
-        Cw += class_weight[k] * np.cov(v_k.T)
-
-    # Shrinkage
-    if (shrinkage < 1) and (shrinkage > 0):
-        Cw = Cw + shrinkage / (1 - shrinkage) * np.eye(DIM)
-    elif shrinkage == 1:
-        Cw = np.eye(DIM)
-
-    # between class
-    if K == 2:
-        u = np.linalg.inv(Cw) @ (MU[1, :] - MU[0, :]).reshape((DIM, 1))
-        u = u / np.linalg.norm(u)
-    else:
-        Cb = np.zeros((DIM, DIM))  # Between-class
-        mu = np.mean(MU, axis=0)
-        for k in range(K):
-            Cb += class_weight[k] * np.outer(MU[k, :] - mu, MU[k, :] - mu)
-
-        if (shrinkage < 1) and (shrinkage > 0):
-            Cw = Cw + shrinkage / (1 - shrinkage) * np.eye(DIM)
-        elif shrinkage == 1:
-            Cw = np.eye(DIM)
-
-        # Solve generalized eigenvalue problem
-        s, u, _ = scipy.linalg.eig(Cb, Cw, left=True)
-        ids = np.argsort(-np.array(s).reshape(-1))[:dim]
-        u = u[:, ids]  # @ np.diag(np.sqrt(np.real(s[ids])))
-
-    # Projection
-    prj_vec = vec @ u
-    if return_class_vec:
-        prj_class_vec = class_vec @ u
-        return prj_vec, prj_class_vec
-    else:
-        return prj_vec
+        for k, v in params.items():
+            setattr(self, k, v)
+        return self
 
 
-def saveSemAxis(filename, class_vec, labels, **kwargs):
-    """Save SemAxis into a file.
+class LDASemAxis(SemAxis):
+    """SemAxis based on Linear Discriminant Analysis.
 
-    :param filename: name of file
-    :type filename: str
-    :param class_vec: embedding vectors for labeled entities
-    :type class_vec: numpy.ndarray
-    :param labels: labels
-    :type labels: numpy.ndarray
+    A variant of SemAxis that finds the axis based on Linear Discriminant Analysis (LDA). This LDA-based SemAxis separates the given two groups more than the original SemAxis approach. The LDA-based SemAxis can find a "space" that best separates the groups.
+    See https://en.wikipedia.org/wiki/Linear_discriminant_analysis.
+
 
     .. highlight:: python
     .. code-block:: python
 
         >>> import emlens
         >>> import numpy as np
-        >>> emb = np.random.randn(100, 20)
-        >>> labels = np.random.choice(100, 10)
-        >>> emlens.saveSemAxis('semspace', class_vec = emb, labels = labels, dim=2, mode = "fda")
+        >>> emb = np.random.randn(100, 20) # Embedding vectors to ground the SemAxis
+        >>> group_ids = np.random.choice(2, 100) # Membership of entities
+        >>> target = np.random.randn(10, 20) # Vectors we will project onto the SemAxis
+        >>> model = emlens.LDASemAxis() # load SemAxis Object
+        >>> model.fit(emb, group_ids) # Fit the SemAxis
+        >>> model.transform(target, dim = 1) # Project `target` to the axis
+        >>> model.transform(target, dim = 2) # Project `target` to a 2D space
+        >>> model.save("random-semaxis.sm") # Save fitted SemAxis object
+        >>> model = emlens.LDASemAxis().load("random-semaxis.sm") # Load fitted SemAxis object
     """
-    if os.path.exists(filename):
-        shutil.rmtree(filename)
-    os.mkdir(filename)
-    emb_filename = "{dir_name}/vec.npz".format(dir_name=filename)
-    param_filename = "{dir_name}/param.json".format(dir_name=filename)
 
-    np.savez(emb_filename, class_vec=class_vec, labels=labels)
-    with open(param_filename, "w") as f:
-        json.dump(kwargs, f)
+    def __init__(self, **params):
+        """Initialize the instnace of SemAxis based on Linear Discriminant
+        Analysis.
 
+        :param mode: type of algorithm, defaults to "fda"
+        :type mode: str, optional
+        """
+        SemAxis.__init__(self, **params)
 
-def SemAxis_from_file(filename, vec, **params):
-    """Calculate SemAxis from file.
+    def transform(self, target, dim=1, **params):
+        """Project the target vectors onto SemAxis.
 
-    :param filename: filename
-    :type filename: str
-    :param vec: Embedding vectors
-    :type vec: numpy.ndarray
-    :return: tuple containing the returns from SemAxis
-    :rtype: tuple
-
-    .. highlight:: python
-    .. code-block:: python
-
-        >>> import emlens
-        >>> xy = emlens.SemAxis_from_file('semspace', emb)
-    """
-    emb_filename = "{dir_name}/vec.npz".format(dir_name=filename)
-    param_filename = "{dir_name}/param.json".format(dir_name=filename)
-
-    data = np.load(emb_filename, allow_pickle=True)
-    class_vec = data["class_vec"]
-    labels = data["labels"]
-
-    with open(param_filename, "r") as f:
-        saved_params = json.load(f)
-
-    if isinstance(params, dict):
-        for k, v in params.items():
-            saved_params[k] = v
-    return SemAxis(vec, class_vec, labels, **saved_params)
+        :param dim: dimension for the projected space, defaults to 1
+        :type dim: int, optional
+        :return: Projected embedding vectors.
+        :rtype: numpy.ndarray (num_data,dim)
+        """
+        lda = LinearDiscriminantAnalysis(n_components=dim, **params)
+        lda.fit(self.emb, self._group_ids)
+        prj_target = lda.transform(target)
+        self.prj_emb = lda.transform(self.emb)
+        return prj_target
