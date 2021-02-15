@@ -145,7 +145,7 @@ def nmi(emb, group_ids, A=None, k=10):
         >>> import numpy as np
         >>> emb = np.random.randn(100, 20)
         >>> g = np.random.choice(10, 100)
-        >>> rho = emlens.modularity(emb, g)
+        >>> rho = emlens.nmi(emb, g)
     """
     if A is None:
         A = make_knn_graph(emb, k=k)
