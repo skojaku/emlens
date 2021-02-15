@@ -40,6 +40,9 @@ class TestCalc(unittest.TestCase):
     def test_nmi(self):
         emlens.nmi(self.emb, self.membership)
 
+    def test_element_sim(self):
+        emlens.element_sim(self.emb, self.membership)
+
     def test_pairwise_dot_similarity(self):
         S, _ = emlens.pairwise_dot_sim(self.emb, self.membership)
         self.assertEqual(S.shape[1], self.K)
