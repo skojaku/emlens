@@ -9,8 +9,7 @@ import emlens
 
 class TestCalc(unittest.TestCase):
     def setUp(self):
-        emb_url = "https://raw.githubusercontent.com/skojaku/emlens/main/data/airportnet/emb.txt"
-        self.emb = np.loadtxt(emb_url)
+        self.emb = np.random.randn(300, 30)
         self.deg = np.random.randn(self.emb.shape[0])
         self.membership = np.random.randint(10, size=self.emb.shape[0])
         self.K = len(set(self.membership))
