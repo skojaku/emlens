@@ -239,7 +239,7 @@ def element_sim(emb, group_ids, A=None, k=10):
     # In ddition, denote by n_{rc} the number of elements that belong to group r in partition A and group c in partition B.
     # By substituting p_ij = alpha / n_A + (1-alpha) * (i == j), we have
     #   S_i = 0.5 * n_{rc} * ( 1/n^A _{g^A _i} +  1/n^B _{g^B _i} - |1/n^A _{g^A _i} - 1/n^B _{g^B _i}|).
-    # Computing this for N nodes requires memory and computation time in order O(NK), where K is the number of groups.
+    # Computing this for N nodes requires memory and computation time in order of O(NK), where K is the number of groups.
     # This order can be substantially lower than O(N^2) if K<<N.
     UA = sparse.csr_matrix((np.ones_like(gA), (np.arange(gA.size), gA)), shape=(M, K))
     UB = sparse.csr_matrix((np.ones_like(gB), (np.arange(gB.size), gB)), shape=(M, K))
