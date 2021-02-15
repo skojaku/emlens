@@ -72,7 +72,7 @@ def assortativity(emb, y, A=None, k=5):
     return stats.pearsonr(y[r], y[c])[0]
 
 
-def modularity(emb, group_ids, A=None, k=5):
+def modularity(emb, group_ids, A=None, k=10):
     """Calculate the modularity of entities with group membership. The
     modularity ranges between [-1,1], where a positive modularity indicates
     that nodes with the same group membership tend to be close each other. Zero
@@ -85,7 +85,7 @@ def modularity(emb, group_ids, A=None, k=5):
     :type group_ids: numpy.ndarray (num_entities, )
     :param A: precomputed adjacency matrix of the graph. If None, a k-nearest neighbor graph will be constructed, defaults to None
     :type A: scipy.csr_matrix, optional
-    :param k: Number of the nearest neighbors, defaults to 5
+    :param k: Number of the nearest neighbors, defaults to 10
     :type k: int, optional
     :return: modularity
     :rtype: float
@@ -112,6 +112,65 @@ def modularity(emb, group_ids, A=None, k=5):
     )
     D = np.array(deg.reshape(1, -1) @ U).reshape(-1)
     Q = np.trace((U.T @ A @ U) - np.outer(D, D) / np.sum(D)) / np.sum(D)
+    return Q
+
+
+def nmi(emb, group_ids, A=None, k=10):
+    """Calculate the Normalized Mutual Information for the entities with group
+    membership. The NMI stands for the Normalized Mutual Information and takes
+    a value between [0,1]. A larger NMI indicates that nodes with the same
+    group membership tend to be close each other. Zero NMI means that
+    membership `group_ids` is independent of the embedding.
+
+    NMI is calculated as follows.
+    1. Construct a k-nearest neighbor graph.
+    2. Calculate the joint distribution of the group memberships of nodes connected by edges
+    3. Calculate the normalized mutual information for the joint distribution.
+
+    :param emb: embedding vectors
+    :type emb: numpy.ndarray (num_entities, dim)
+    :param group_ids: group membership for entities
+    :type group_ids: numpy.ndarray (num_entities, )
+    :param A: precomputed adjacency matrix of the graph. If None, a k-nearest neighbor graph will be constructed, defaults to None
+    :type A: scipy.csr_matrix, optional
+    :param k: Number of the nearest neighbors, defaults to 10
+    :type k: int, optional
+    :return: modularity
+    :rtype: float
+
+    .. highlight:: python
+    .. code-block:: python
+
+        >>> import emlens
+        >>> import numpy as np
+        >>> emb = np.random.randn(100, 20)
+        >>> g = np.random.choice(10, 100)
+        >>> rho = emlens.modularity(emb, g)
+    """
+    if A is None:
+        A = make_knn_graph(emb, k=k)
+
+    # Assign integers to group ids
+    _, cids = np.unique(group_ids, return_inverse=True)
+
+    # Get size
+    K = max(cids) + 1
+    N = cids.size
+
+    # Calculate the joint distribution
+    U = sparse.csr_matrix(
+        (np.ones_like(cids), (np.arange(cids.size), cids)), shape=(N, K)
+    )
+    prc = np.array((U.T @ A @ U).toarray())
+    prc = prc / np.sum(prc)
+    pr = np.array(np.sum(prc, axis=1)).reshape(-1)
+    pc = np.array(np.sum(prc, axis=0)).reshape(-1)
+
+    # Calculate the mutual information
+    Irc = stats.entropy(prc.reshape(-1), np.outer(pr, pc).reshape(-1))
+
+    # Normalize MI
+    Q = 2 * Irc / (stats.entropy(pr) + stats.entropy(pc))
     return Q
 
 
