@@ -1,4 +1,4 @@
 faiss
-numpy
+numpy>=1.16.5
 scikit-learn
 scipy
