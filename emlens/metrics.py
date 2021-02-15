@@ -236,7 +236,7 @@ def element_sim(emb, group_ids, A=None, k=10):
     #   = 2 - \sum_{g^A _i = g^A _j and g^B _i = g^B _j} |p^A _{ij}| + |p^B _{ij}| -  |p^A _{ij} - p^B _{ij}|.
     # where g^A _i is the membership of i in partition A.
     # Denote by n^A _r the number of elements that belong to group r in partition A (and we analagously define n^B _c).
-    # In ddition, Denote by n_{rc} the number of elements that belong to group r in partition A and group c in partition B.
+    # In ddition, denote by n_{rc} the number of elements that belong to group r in partition A and group c in partition B.
     # By substituting p_ij = alpha / n_A + (1-alpha) * (i == j), we have
     #   S_i = 0.5 * n_{rc} * ( 1/n^A _{g^A _i} +  1/n^B _{g^B _i} - |1/n^A _{g^A _i} - 1/n^B _{g^B _i}|).
     # Computing this for N nodes requires memory and computation time in order O(NK), where K is the number of groups.
