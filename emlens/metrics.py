@@ -174,7 +174,7 @@ def nmi(emb, group_ids, A=None, k=10):
     return Q
 
 
-def element_sim(emb, group_ids, A=None, k=10, alpha=0.9):
+def element_sim(emb, group_ids, A=None, k=10):
     """Calculate the Element Centric Clustering Similarity for the entities
     with group membership.
 
@@ -201,8 +201,6 @@ def element_sim(emb, group_ids, A=None, k=10, alpha=0.9):
     :type A: scipy.csr_matrix, optional
     :param k: Number of the nearest neighbors, defaults to 10
     :type k: int, optional
-    :param alpha: one minus restarting probability, defaults to 0.9
-    :type alpha: float, optional
     :return: element centric similarity
     :rtype: float
 
@@ -230,27 +228,33 @@ def element_sim(emb, group_ids, A=None, k=10, alpha=0.9):
     gA, gB = cids[r], cids[c]
 
     # Calculate the element centric similarity
-    # The similarity is based on p_ij for prtition gA, which is given by
-    #   p^A _ij = alpha / np.sum(gA[i]==gA) + (1-alpha) * (i == j)
-    # In matrix form:
-    #   p^A _ij = UA @ UA.T + (1-alpha) * np.eye(UA.shape[0])
-    # where
-    #   UA = U @ np.diag(_UA.sum(axis = 0))
-    # and _UA[i,l]=1 or _UA[i,l]=0 indiactes that item i belongs to group l or not, respectively.
-    # We compute the similarity using the matrix form because it is more efficient to compute in python
+    # A naive calculation is to compute individual p_ij and then sum them up to calculate S_i.
+    # However, this requires O(N^2) memory and computation time. To compute it efficiently, we
+    # rewrite \sum_{j} |p^A _{ij} - p^B _{ij}| in Eq. 5 of the original paper as
+    #   \sum_{j} |p^A _{ij} - p^B _{ij}| + \sum_{j} |p^A _{ij}| + \sum_{j} |p^B _{ij}|
+    #       + \sum_{g^A _i = g^A _j and g^B _i = g^B _j} ( |p^A _{ij} - p^B _{ij}| - |p^A _{ij}| - |p^B _{ij}|)
+    #   = 2 - \sum_{g^A _i = g^A _j and g^B _i = g^B _j} |p^A _{ij}| + |p^B _{ij}| -  |p^A _{ij} - p^B _{ij}|.
+    # where g^A _i is the membership of i in partition A.
+    # Denote by n^A _r the number of elements that belong to group r in partition A (and we analagously define n^B _c).
+    # In ddition, Denote by n_{rc} the number of elements that belong to group r in partition A and group c in partition B.
+    # By substituting p_ij = alpha / n_A + (1-alpha) * (i == j), we have
+    #   S_i = 0.5 * n_{rc} * ( 1/n^A _{g^A _i} +  1/n^B _{g^B _i} - |1/n^A _{g^A _i} - 1/n^B _{g^B _i}|).
+    # Computing this for N nodes requires memory and computation time in order O(NK), where K is the number of groups.
+    # This order can be substantially lower than O(N^2) if K<<N.
+    UA = sparse.csr_matrix((np.ones_like(gA), (np.arange(gA.size), gA)), shape=(M, K))
+    UB = sparse.csr_matrix((np.ones_like(gB), (np.arange(gB.size), gB)), shape=(M, K))
 
-    _UA = sparse.csr_matrix((np.ones_like(gA), (np.arange(gA.size), gA)), shape=(M, K))
-    _UB = sparse.csr_matrix((np.ones_like(gB), (np.arange(gB.size), gB)), shape=(M, K))
-    UA = _UA @ sparse.diags(
-        1.0 / np.sqrt(np.maximum(1, np.array(_UA.sum(axis=0)).reshape(-1)))
-    )
-    UB = _UB @ sparse.diags(
-        1.0 / np.sqrt(np.maximum(1, np.array(_UB.sum(axis=0)).reshape(-1)))
-    )
+    fA = np.array(UA.sum(axis=0)).reshape(-1)
+    fB = np.array(UB.sum(axis=0)).reshape(-1)
+    fAB = (UA.T @ UB).toarray()
 
-    D = UA @ UA.T - UB @ UB.T
-    Q = 1 - np.sum(np.abs(D.data)) / (2 * alpha * M)
-    return Q
+    Si = (
+        0.5
+        * fAB[(gA, gB)]
+        * (1.0 / fA[gA] + 1.0 / fB[gB] - np.abs(1.0 / fA[gA] - 1.0 / fB[gB]))
+    )
+    S = np.mean(Si)
+    return S
 
 
 def pairwise_dot_sim(emb, group_ids):
