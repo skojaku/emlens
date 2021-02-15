@@ -174,6 +174,81 @@ def nmi(emb, group_ids, A=None, k=10):
     return Q
 
 
+def element_sim(emb, group_ids, A=None, k=10, alpha=0.9):
+    """Calculate the Element Centric Clustering Similarity for the entities
+    with group membership.
+
+    Gates, A. J., Wood, I. B., Hetrick, W. P., & Ahn, Y. Y. (2019). Element-centric clustering comparison unifies overlaps and hierarchy. Scientific Reports, 9(1), 1–13. https://doi.org/10.1038/s41598-019-44892-y
+
+    This similarity takes a value between [0,1]. A larger value indicates that nodes with the same group membership tend to be close each other. Zero value means that
+    membership `group_ids` is independent of the embedding.
+
+    The Element Centric Clustering Similarity is calculated as follows.
+    1. Construct a k-nearest neighbor graph.
+    2. For each edge connecting nodes i and j (i<j), find the groups g_i and g_j to which the nodes belong.
+    4. Make a list, L, of g_i's for nodes at the one end of the edges. Then, make another list, L', of nodes at the other end of the edges.
+    5. Calculate the difference between L and L' using the Element Centric Clustering Similarity.
+
+    :param emb: embedding vectors
+    :type emb: numpy.ndarray (num_entities, dim)
+    :param group_ids: group membership for entities
+    :type group_ids: numpy.ndarray (num_entities, )
+    :param A: precomputed adjacency matrix of the graph. If None, a k-nearest neighbor graph will be constructed, defaults to None
+    :type A: scipy.csr_matrix, optional
+    :param k: Number of the nearest neighbors, defaults to 10
+    :type k: int, optional
+    :param alpha: one minus restarting probability, defaults to 0.9
+    :type alpha: float, optional
+    :return: modularity
+    :rtype: float
+
+    .. highlight:: python
+    .. code-block:: python
+
+        >>> import emlens
+        >>> import numpy as np
+        >>> emb = np.random.randn(100, 20)
+        >>> g = np.random.choice(10, 100)
+        >>> rho = emlens.element_sim(emb, g)
+    """
+    if A is None:
+        A = make_knn_graph(emb, k=k)
+
+    # Assign integers to group ids
+    _, cids = np.unique(group_ids, return_inverse=True)
+
+    # Get size
+    K = max(cids) + 1
+    M = len(A.data)
+
+    # Make a list of group memebrships
+    r, c, _ = sparse.find(A)
+    gA, gB = cids[r], cids[c]
+
+    # Calculate the element centric similarity
+    # The similarity is based on p_ij for prtition gA, which is given by
+    #   p^A _ij = alpha / np.sum(gA[i]==gA) + (1-alpha) * (i == j)
+    # In matrix form:
+    #   p^A _ij = UA @ UA.T + (1-alpha) * np.eye(UA.shape[0])
+    # where
+    #   UA = U @ np.diag(_UA.sum(axis = 0))
+    # and _UA[i,l]=1 or _UA[i,l]=0 indiactes that item i belongs to group l or not, respectively.
+    # We compute the similarity using the matrix form because it is more efficient to compute in python
+
+    _UA = sparse.csr_matrix((np.ones_like(gA), (np.arange(gA.size), gA)), shape=(M, K))
+    _UB = sparse.csr_matrix((np.ones_like(gB), (np.arange(gB.size), gB)), shape=(M, K))
+    UA = _UA @ sparse.diags(
+        1.0 / np.sqrt(np.maximum(1, np.array(_UA.sum(axis=0)).reshape(-1)))
+    )
+    UB = _UB @ sparse.diags(
+        1.0 / np.sqrt(np.maximum(1, np.array(_UB.sum(axis=0)).reshape(-1)))
+    )
+
+    D = UA @ UA.T - UB @ UB.T
+    Q = 1 - np.sum(np.abs(D.data)) / (2 * alpha * M)
+    return Q
+
+
 def pairwise_dot_sim(emb, group_ids):
     """Pairwise distance between groups. The dot similarity between two groups
     i and j is calculated by averaging the dot similarity of entities in group
