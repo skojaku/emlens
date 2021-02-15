@@ -135,7 +135,7 @@ def nmi(emb, group_ids, A=None, k=10):
     :type A: scipy.csr_matrix, optional
     :param k: Number of the nearest neighbors, defaults to 10
     :type k: int, optional
-    :return: modularity
+    :return: normalized mutual information
     :rtype: float
 
     .. highlight:: python
@@ -178,15 +178,19 @@ def element_sim(emb, group_ids, A=None, k=10, alpha=0.9):
     """Calculate the Element Centric Clustering Similarity for the entities
     with group membership.
 
-    Gates, A. J., Wood, I. B., Hetrick, W. P., & Ahn, Y. Y. (2019). Element-centric clustering comparison unifies overlaps and hierarchy. Scientific Reports, 9(1), 1–13. https://doi.org/10.1038/s41598-019-44892-y
+    Gates, A. J., Wood, I. B., Hetrick, W. P., & Ahn, Y. Y. (2019).
+    Element-centric clustering comparison unifies overlaps and hierarchy.
+    Scientific Reports, 9(1), 1–13. https://doi.org/10.1038/s41598-019-44892-y
 
-    This similarity takes a value between [0,1]. A larger value indicates that nodes with the same group membership tend to be close each other. Zero value means that
-    membership `group_ids` is independent of the embedding.
+    This similarity takes a value between [0,1]. A larger value indicates that nodes with the same group
+    membership tend to be close each other. Zero value means that membership `group_ids` is independent of
+    the embedding.
 
     The Element Centric Clustering Similarity is calculated as follows.
     1. Construct a k-nearest neighbor graph.
     2. For each edge connecting nodes i and j (i<j), find the groups g_i and g_j to which the nodes belong.
-    4. Make a list, L, of g_i's for nodes at the one end of the edges. Then, make another list, L', of nodes at the other end of the edges.
+    4. Make a list, L, of g_i's for nodes at the one end of the edges. Then, make another list, L', of nodes
+       at the other end of the edges.
     5. Calculate the difference between L and L' using the Element Centric Clustering Similarity.
 
     :param emb: embedding vectors
@@ -199,7 +203,7 @@ def element_sim(emb, group_ids, A=None, k=10, alpha=0.9):
     :type k: int, optional
     :param alpha: one minus restarting probability, defaults to 0.9
     :type alpha: float, optional
-    :return: modularity
+    :return: element centric similarity
     :rtype: float
 
     .. highlight:: python
