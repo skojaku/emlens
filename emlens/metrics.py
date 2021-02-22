@@ -282,8 +282,8 @@ def r2_score(emb, target, **params):
 def knn_pred_score(
     emb,
     target,
-    k=10,
     A=None,
+    k=10,
     n_splits=10,
     target_type="disc",
     iteration=1,
@@ -308,6 +308,8 @@ def knn_pred_score(
     :type emb: numpy.ndarray (num_entities, dim)
     :param target: target variable to predict
     :type target: numpy.ndarray (num_target,)
+    :param A: precomputed adjacency matrix of the graph. If None, a k-nearest neighbor graph will be constructed, defaults to None
+    :type A: scipy.csr_matrix, optional
     :param k: Number of nearest neighbors, defaults to 10
     :type k: int, optional
     :param n_splits: Number of folds, defaults to 10
@@ -328,7 +330,8 @@ def knn_pred_score(
         elif target_type == "cont":
             scoring_func = skmetrics.r2_score
 
-    A = make_knn_graph(emb, k)
+    if A is None:
+        A = make_knn_graph(emb, k=k)
 
     scores = []
     for _i in range(iteration):
@@ -342,11 +345,11 @@ def knn_pred_score(
             B = A[test_index, :][:, train_index]
 
             # Evaluation
-            y_pred = np.zeros(len(test_index))
+            y_pred = -np.ones(len(test_index))
             for i in range(B.shape[0]):
                 neighbors_variables = y_train[B.indices[B.indptr[i] : B.indptr[i + 1]]]
                 if target_type == "disc":
-                    y_pred[i] = stats.mode(neighbors_variables)
+                    y_pred[i] = stats.mode(neighbors_variables)[0]
                 elif target_type == "cont":
                     y_pred[i] = np.mean(neighbors_variables)
             _score = scoring_func(y_test, y_pred)
