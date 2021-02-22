@@ -39,6 +39,11 @@ class TestCalc(unittest.TestCase):
     def test_nmi(self):
         emlens.nmi(self.emb, self.membership)
 
+    def test_knn_pred_score(self):
+        emlens.knn_pred_score(self.emb, self.membership)
+        emlens.r2_score(self.emb, self.membership)
+        emlens.f1_score(self.emb, self.membership)
+
     def test_element_sim(self):
         emlens.element_sim(self.emb, self.membership)
 
