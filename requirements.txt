@@ -1,4 +1,8 @@
-faiss
-numpy>=1.16.5
-scikit-learn
-scipy
+certifi==2020.12.5
+faiss-cpu==1.7.0
+joblib==1.0.1
+numba==0.50.0
+numpy==1.20.1
+scikit-learn==0.24.1
+scipy==1.6.1
+threadpoolctl==2.1.0
