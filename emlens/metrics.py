@@ -280,7 +280,14 @@ def r2_score(emb, target, **params):
 
 
 def knn_pred_score(
-    emb, target, k=10, n_splits=10, target_type="disc", iteration=1, scoring_func=None
+    emb,
+    target,
+    k=10,
+    A=None,
+    n_splits=10,
+    target_type="disc",
+    iteration=1,
+    scoring_func=None,
 ):
     """Measuring the prediction performance based on the K-Nearest Neighbor
     Graph.
@@ -321,26 +328,28 @@ def knn_pred_score(
         elif target_type == "cont":
             scoring_func = skmetrics.r2_score
 
+    A = make_knn_graph(emb, k)
+
     scores = []
     for _i in range(iteration):
         kf = KFold(n_splits=n_splits)
         _scores = []
         for train_index, test_index in kf.split(emb, target):
+            y_train = target[train_index]
+            y_test = target[test_index]
 
             # Train
-            index = faiss.IndexFlatL2(emb.shape[1])
-            index.add(emb[train_index, :].astype(np.float32))
-
-            # Test
-            _, indices = index.search(emb[test_index, :].astype(np.float32), k=k)
+            B = A[test_index, :][:, train_index]
 
             # Evaluation
-            y = target[test_index]
-            if target_type == "disc":
-                pred = np.array(stats.mode(target[indices], axis=1)[0]).reshape(-1)
-            elif target_type == "cont":
-                pred = np.array(np.mean(target[indices], axis=1)).reshape(-1)
-            _score = scoring_func(y, pred)
+            y_pred = np.zeros(len(test_index))
+            for i in range(B.shape[0]):
+                neighbors_variables = y_train[B.indices[B.indptr[i] : B.indptr[i + 1]]]
+                if target_type == "disc":
+                    y_pred[i] = stats.mode(neighbors_variables)
+                elif target_type == "cont":
+                    y_pred[i] = np.mean(neighbors_variables)
+            _score = scoring_func(y_test, y_pred)
             _scores += [_score]
 
         scores += [np.mean(_scores)]
