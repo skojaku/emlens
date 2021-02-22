@@ -26,7 +26,7 @@ setup(
     description="A lightweight toolbox for understanding embedding space",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    packages=find_packages("emlens"),
+    packages=find_packages(),
     install_requires=load_requires_from_file("requirements.txt"),
     include_package_data=True,
     zip_safe=False,
