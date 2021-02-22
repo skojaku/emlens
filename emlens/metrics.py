@@ -292,10 +292,10 @@ def knn_pred_score(
     2. Using the training set, predict the `target` variable for the entities in the training set.
     3. Calculate the prediction accuracy
     4. Repeat Steps 1-3 such that each group is used as the test set once.
-    5. Compute the average of the prediction accuracy computed in the Step 3.
+    5. Compute the average of the prediction accuracy computed in Step 3.
 
-    The performance score is measured based on the micro f1-score for discrete target variable or R^2 for continuous target variable.
-    Other scoring measure can be used by passing the score function as `scoring_func argument`.
+    The performance score is measured based on the micro f1-score for the discrete target variable or R^2 for the continuous target variable.
+    Other scoring measures can be used by passing the score function as `scoring_func argument`.
 
     :param emb: embedding vectors
     :type emb: numpy.ndarray (num_entities, dim)
