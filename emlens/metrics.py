@@ -1,6 +1,10 @@
+from functools import partial
+
 import faiss
 import numpy as np
 from scipy import sparse, stats
+from sklearn import metrics as skmetrics
+from sklearn.model_selection import KFold
 
 
 def make_knn_graph(emb, k=5):
@@ -255,6 +259,93 @@ def element_sim(emb, group_ids, A=None, k=10):
     )
     S = np.mean(Si)
     return S
+
+
+def f1_score(emb, target, **params):
+    """Measuring the prediction performance based on the K-Nearest Neighbor
+    Graph.
+
+    Equivalent to knn_pred_score(emb, target, target_type = "disc").
+    """
+    return knn_pred_score(emb, target, target_type="disc", **params)
+
+
+def r2_score(emb, target, **params):
+    """Measuring the prediction performance based on the K-Nearest Neighbor
+    Graph.
+
+    Equivalent to knn_pred_score(emb, target, target_type = "cont").
+    """
+    return knn_pred_score(emb, target, target_type="cont", **params)
+
+
+def knn_pred_score(
+    emb, target, k=10, n_splits=10, target_type="disc", iteration=1, scoring_func=None
+):
+    """Measuring the prediction performance based on the K-Nearest Neighbor
+    Graph.
+
+    This function measures how well the embedding space can predict the metadata of entities using the K-nearest neighbor graph.
+    To this end, the following K-folds cross validation is performed:
+    0. Split all entities into K groups.
+    1. Take one group as a test set and the other groups as a training set
+    2. Using the training set, predict the `target` variable for the entities in the training set.
+    3. Calculate the prediction accuracy
+    4. Repeat Steps 1-3 such that each group is used as the test set once.
+    5. Compute the average of the prediction accuracy computed in the Step 3.
+
+    The performance score is measured based on the micro f1-score for discrete target variable or R^2 for continuous target variable.
+    Other scoring measure can be used by passing the score function as `scoring_func argument`.
+
+    :param emb: embedding vectors
+    :type emb: numpy.ndarray (num_entities, dim)
+    :param target: target variable to predict
+    :type target: numpy.ndarray (num_target,)
+    :param k: Number of nearest neighbors, defaults to 10
+    :type k: int, optional
+    :param n_splits: Number of folds, defaults to 10
+    :type n_splits: int, optional
+    :param target_type: type of target type, defaults to "auto"
+    :type target_type: str, optional
+    :param scoring_func: scoring function. This function will take a target variable `y` as the first argumebt and predicted variable `ypred` as the second argumebt, and ouputs the prediction score `score`, i.e., score=scoring_func(y, ypred). If None, the scoring function will be determined based on `target_type`, defaults to None
+    :type scoring_func: numpy func, optional
+    :param iteration: Number of rounds of the cross validation. If iteration>1, the average of the cross validation score will be returned., defaults to 1.
+    :type iteration: int
+    :return: performance score
+    :rtype: float
+    """
+
+    if scoring_func is None:
+        if target_type == "disc":
+            scoring_func = partial(skmetrics.f1_score, average="micro")
+        elif target_type == "cont":
+            scoring_func = skmetrics.r2_score
+
+    scores = []
+    for _i in range(iteration):
+        kf = KFold(n_splits=n_splits)
+        _scores = []
+        for train_index, test_index in kf.split(emb, target):
+
+            # Train
+            index = faiss.IndexFlatL2(emb.shape[1])
+            index.add(emb[train_index, :].astype(np.float32))
+
+            # Test
+            _, indices = index.search(emb[test_index, :].astype(np.float32), k=k)
+
+            # Evaluation
+            y = target[test_index]
+            if target_type == "disc":
+                pred = np.array(stats.mode(target[indices], axis=1)[0]).reshape(-1)
+            elif target_type == "cont":
+                pred = np.array(np.mean(target[indices], axis=1)).reshape(-1)
+            _score = scoring_func(y, pred)
+            _scores += [_score]
+
+        scores += [np.mean(_scores)]
+    score = np.mean(scores)
+    return score
 
 
 def pairwise_dot_sim(emb, group_ids):
