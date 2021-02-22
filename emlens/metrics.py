@@ -333,25 +333,35 @@ def knn_pred_score(
     if A is None:
         A = make_knn_graph(emb, k=k)
 
+    if target_type == "disc":
+        _, _target = np.unique(target, return_inverse=True)
+    else:
+        _target = target
+
     scores = []
     for _i in range(iteration):
         kf = KFold(n_splits=n_splits)
         _scores = []
-        for train_index, test_index in kf.split(emb, target):
-            y_train = target[train_index]
-            y_test = target[test_index]
+        for train_index, test_index in kf.split(_target):
+            y_train = _target[train_index]
+            y_test = _target[test_index]
 
             # Train
             B = A[test_index, :][:, train_index]
 
             # Evaluation
-            y_pred = -np.ones(len(test_index))
+            y_pred = -np.zeros(len(test_index)) * np.nan
             for i in range(B.shape[0]):
                 neighbors_variables = y_train[B.indices[B.indptr[i] : B.indptr[i + 1]]]
+                if len(neighbors_variables) == 0:
+                    continue
+
                 if target_type == "disc":
                     y_pred[i] = stats.mode(neighbors_variables)[0]
                 elif target_type == "cont":
                     y_pred[i] = np.mean(neighbors_variables)
+            nonnan = ~np.isnan(y_pred)
+            y_test, y_pred = y_test[nonnan], y_pred[nonnan]
             _score = scoring_func(y_test, y_pred)
             _scores += [_score]
 
