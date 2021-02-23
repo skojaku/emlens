@@ -354,16 +354,22 @@ def knn_pred_score(
             y_test = target[test_index]
 
             # Train
-            B = A[test_index, :][:, train_index]
+            B = sparse.csr_matrix(A[test_index, :][:, train_index])
 
             # Evaluation
             y_pred = -np.zeros(len(test_index)) * np.nan
             for i in range(B.shape[0]):
-                neighbors_variables = y_train[B.indices[B.indptr[i] : B.indptr[i + 1]]]
-                if len(neighbors_variables) == 0:  # no neighbors, then skip
+
+                # pick neighbors and edge weights
+                nei = B.indices[B.indptr[i] : B.indptr[i + 1]]
+
+                if len(nei) == 0:  # no neighbors, then skip
                     continue
+
+                neighbors_variables = y_train[nei]
+
                 if (
-                    len(neighbors_variables) > k
+                    len(nei) > k
                 ):  # if more than k neighbors, then pick the k neighbors connected by large edge weights
                     w = B.data[B.indptr[i] : B.indptr[i + 1]]
                     ind = np.argsort(-w)[:k]
