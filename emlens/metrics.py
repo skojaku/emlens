@@ -7,13 +7,14 @@ from sklearn import metrics as skmetrics
 from sklearn.model_selection import KFold
 
 
-def make_knn_graph(emb, k=5):
+def make_knn_graph(emb, k=5, binarize=True):
     """Construct the k-nearest neighbor graph from the embedding vectors.
 
     :param emb: embedding vectors
     :type emb: numpy.ndarray (num_entities, dim)
     :param k: Number of nearest neighbors, defaults to 5
     :type k: int, optional
+    :param binarize: `binarize=False` will set the weight of the between nodes i and j  by exp(-d_{ij]}). `binarize=True` will set to one., defaults to True
     :return: The adjacency matrix of the k-nearest neighbor graph
     :rtype: sparse.csr_matrix
 
@@ -25,16 +26,34 @@ def make_knn_graph(emb, k=5):
         >>> emb = np.random.randn(100, 20)
         >>> A = emlens.make_knn_graph(emb, k = 10)
     """
+    # Find the nearest neighbors
     index = faiss.IndexFlatL2(emb.shape[1])
     index.add(emb.astype(np.float32))
     distances, indices = index.search(emb.astype(np.float32), k=k)
     r = np.outer(np.arange(indices.shape[0]), np.ones((1, k))).astype(int)
     c = indices.astype(int).reshape(-1)
+    distances = distances.reshape(-1)
     r = r.reshape(-1)
     N = emb.shape[0]
-    A = sparse.csr_matrix((np.ones_like(r), (r, c)), shape=(N, N))
-    A = A + A.T
-    A.data = np.ones_like(A.data)
+
+    # Remove multi edges
+    pair_ids = np.maximum(r, c) + np.minimum(r, c) * N
+    _, ind = np.unique(pair_ids, return_index=True)
+    r, c, distances = r[ind], c[ind], distances[ind]
+
+    # Construct K-NN graph
+    if binarize is True:
+        A = sparse.csr_matrix((np.ones_like(distances), (r, c)), shape=(N, N))
+    else:
+        # Sort the neighbors in descending order of edge weights
+        A = sparse.csr_matrix((np.exp(-distances), (r, c)), shape=(N, N))
+        for i in range(A.shape[0]):
+            w = A.data[A.indptr[i] : A.indptr[i + 1]]
+            nei = A.indices[A.indptr[i] : A.indptr[i + 1]]
+
+            order = np.argsort(A.data[A.indptr[i] : A.indptr[i + 1]])[::-1]
+            A.data[A.indptr[i] : A.indptr[i + 1]] = w[order].copy()
+            A.indices[A.indptr[i] : A.indptr[i + 1]] = nei[order].copy()
     return A
 
 
@@ -261,33 +280,31 @@ def element_sim(emb, group_ids, A=None, k=10):
     return S
 
 
-def f1_score(emb, target, **params):
+def f1_score(emb, target, agg="mode", **params):
     """Measuring the prediction performance based on the K-Nearest Neighbor
     Graph.
 
     Equivalent to knn_pred_score(emb, target, target_type = "disc").
     """
-    return knn_pred_score(emb, target, target_type="disc", **params)
+
+    scoring_func = partial(skmetrics.f1_score, average="micro")
+    _, _target = np.unique(target, return_inverse=True)
+
+    return knn_pred_score(emb, _target, scoring_func=scoring_func, agg=agg, **params)
 
 
-def r2_score(emb, target, **params):
+def r2_score(emb, target, agg="mean", **params):
     """Measuring the prediction performance based on the K-Nearest Neighbor
     Graph.
 
     Equivalent to knn_pred_score(emb, target, target_type = "cont").
     """
-    return knn_pred_score(emb, target, target_type="cont", **params)
+    scoring_func = skmetrics.r2_score
+    return knn_pred_score(emb, target, scoring_func=scoring_func, agg=agg, **params)
 
 
 def knn_pred_score(
-    emb,
-    target,
-    A=None,
-    k=10,
-    n_splits=10,
-    target_type="disc",
-    iteration=1,
-    scoring_func=None,
+    emb, target, scoring_func, agg="mode", A=None, k=10, n_splits=10, iteration=1,
 ):
     """Measuring the prediction performance based on the K-Nearest Neighbor
     Graph.
@@ -308,43 +325,33 @@ def knn_pred_score(
     :type emb: numpy.ndarray (num_entities, dim)
     :param target: target variable to predict
     :type target: numpy.ndarray (num_target,)
+    :param scoring_func: scoring function. This function will take a target variable `y` as the first argumebt and predicted variable `ypred` as the second argumebt, and ouputs the prediction score `score`, i.e., score=scoring_func(y, ypred).
+    :type scoring_func: numpy func
+    :paramm agg: How to aggregate the neighbors' variables. Setting `aggregation='mode'` uses the most frequent label, `='mean'` uses the mean as the predicted variable.
+                 If there are more than k neighbors, aggregate the k neighbors connected by the edges with the largest weights, defaults to 'mode'
+    :type agg: str
     :param A: precomputed adjacency matrix of the graph. If None, a k-nearest neighbor graph will be constructed, defaults to None
     :type A: scipy.csr_matrix, optional
     :param k: Number of nearest neighbors, defaults to 10
     :type k: int, optional
     :param n_splits: Number of folds, defaults to 10
     :type n_splits: int, optional
-    :param target_type: type of target type, defaults to "auto"
-    :type target_type: str, optional
-    :param scoring_func: scoring function. This function will take a target variable `y` as the first argumebt and predicted variable `ypred` as the second argumebt, and ouputs the prediction score `score`, i.e., score=scoring_func(y, ypred). If None, the scoring function will be determined based on `target_type`, defaults to None
-    :type scoring_func: numpy func, optional
     :param iteration: Number of rounds of the cross validation. If iteration>1, the average of the cross validation score will be returned., defaults to 1.
     :type iteration: int
     :return: performance score
     :rtype: float
     """
 
-    if scoring_func is None:
-        if target_type == "disc":
-            scoring_func = partial(skmetrics.f1_score, average="micro")
-        elif target_type == "cont":
-            scoring_func = skmetrics.r2_score
-
     if A is None:
         A = make_knn_graph(emb, k=k)
-
-    if target_type == "disc":
-        _, _target = np.unique(target, return_inverse=True)
-    else:
-        _target = target
 
     scores = []
     for _i in range(iteration):
         kf = KFold(n_splits=n_splits)
         _scores = []
-        for train_index, test_index in kf.split(_target):
-            y_train = _target[train_index]
-            y_test = _target[test_index]
+        for train_index, test_index in kf.split(target):
+            y_train = target[train_index]
+            y_test = target[test_index]
 
             # Train
             B = A[test_index, :][:, train_index]
@@ -353,16 +360,25 @@ def knn_pred_score(
             y_pred = -np.zeros(len(test_index)) * np.nan
             for i in range(B.shape[0]):
                 neighbors_variables = y_train[B.indices[B.indptr[i] : B.indptr[i + 1]]]
-                if len(neighbors_variables) == 0:
+                if len(neighbors_variables) == 0:  # no neighbors, then skip
                     continue
+                if (
+                    len(neighbors_variables) > k
+                ):  # if more than k neighbors, then pick the k neighbors connected by large edge weights
+                    w = B.data[B.indptr[i] : B.indptr[i + 1]]
+                    ind = np.argsort(-w)[:k]
+                    neighbors_variables = neighbors_variables[ind]
 
-                if target_type == "disc":
+                if agg == "mode":
                     y_pred[i] = stats.mode(neighbors_variables)[0]
-                elif target_type == "cont":
+                elif agg == "mean":
                     y_pred[i] = np.mean(neighbors_variables)
             nonnan = ~np.isnan(y_pred)
             y_test, y_pred = y_test[nonnan], y_pred[nonnan]
             _score = scoring_func(y_test, y_pred)
+
+            if np.isnan(_score):
+                continue
             _scores += [_score]
 
         scores += [np.mean(_scores)]
