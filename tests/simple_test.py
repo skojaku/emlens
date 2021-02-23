@@ -30,6 +30,10 @@ class TestCalc(unittest.TestCase):
         model.save("random-semaxis.sm")
         shutil.rmtree("random-semaxis.sm")
 
+    def test_make_knn_graph(self):
+        emlens.make_knn_graph(self.emb)
+        emlens.make_knn_graph(self.emb, k=40, binarize=False)
+
     def test_assortativity(self):
         emlens.assortativity(self.emb, self.deg)
 
@@ -38,6 +42,15 @@ class TestCalc(unittest.TestCase):
 
     def test_nmi(self):
         emlens.nmi(self.emb, self.membership)
+
+    def test_knn_pred_score(self):
+        emlens.r2_score(self.emb, self.membership)
+        emlens.f1_score(self.emb, self.membership)
+
+    def test_knn_pred_score_from_net(self):
+        A = emlens.make_knn_graph(self.emb, k=40, binarize=False)
+        emlens.r2_score(self.emb, self.membership, A=A)
+        emlens.f1_score(self.emb, self.membership, A=A)
 
     def test_element_sim(self):
         emlens.element_sim(self.emb, self.membership)
