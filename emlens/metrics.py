@@ -304,7 +304,15 @@ def r2_score(emb, target, agg="mean", **params):
 
 
 def knn_pred_score(
-    emb, target, scoring_func, agg="mode", A=None, k=10, n_splits=10, iteration=1,
+    emb,
+    target,
+    scoring_func,
+    agg="mode",
+    A=None,
+    k=10,
+    n_splits=10,
+    iteration=1,
+    return_scores=False,
 ):
     """Measuring the prediction performance based on the K-Nearest Neighbor
     Graph.
@@ -346,6 +354,7 @@ def knn_pred_score(
         A = make_knn_graph(emb, k=k)
 
     scores = []
+    all_score = []
     for _i in range(iteration):
         kf = KFold(n_splits=n_splits)
         _scores = []
@@ -386,10 +395,14 @@ def knn_pred_score(
             if np.isnan(_score):
                 continue
             _scores += [_score]
+            all_score += [_score]
 
         scores += [np.mean(_scores)]
     score = np.mean(scores)
-    return score
+    if return_scores:
+        return score, all_score
+    else:
+        return score
 
 
 def pairwise_dot_sim(emb, group_ids):

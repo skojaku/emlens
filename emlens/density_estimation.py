@@ -27,7 +27,7 @@ def estimate_pdf(target, emb, C=0.1):
         >>> import numpy as np
         >>> emb = np.random.randn(100, 20)
         >>> target = np.random.randn(10, 20)
-        >>> density = emlens.make_knn_graph(target=target, emb = emb)
+        >>> density = emlens.estimate_pdf(target=target, emb = emb)
     """
     n = emb.shape[0]
     dim = emb.shape[1]
