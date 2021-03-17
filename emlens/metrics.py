@@ -7,7 +7,7 @@ from sklearn import metrics as skmetrics
 from sklearn.model_selection import KFold
 
 
-def make_knn_graph(emb, k=5, binarize=True):
+def make_knn_graph(emb, k=5, binarize=True, symmetrize=True):
     """Construct the k-nearest neighbor graph from the embedding vectors.
 
     :param emb: embedding vectors
@@ -15,6 +15,9 @@ def make_knn_graph(emb, k=5, binarize=True):
     :param k: Number of nearest neighbors, defaults to 5
     :type k: int, optional
     :param binarize: `binarize=False` will set the weight of the between nodes i and j  by exp(-d_{ij]}). `binarize=True` will set to one., defaults to True
+    :type param: bool
+    :param symmetrize: `symmetrize=True` will symmetrize the graph. If two nodes are connected by two edges, edge weights will be doubled if `binarize=False`, and 1 if `binarize=True`
+    :type symmetrize: bool
     :return: The adjacency matrix of the k-nearest neighbor graph
     :rtype: sparse.csr_matrix
 
@@ -37,18 +40,18 @@ def make_knn_graph(emb, k=5, binarize=True):
     N = emb.shape[0]
 
     # Remove multi edges
-    pair_ids = np.maximum(r, c) + np.minimum(r, c) * N
-    _, ind = np.unique(pair_ids, return_index=True)
-    r, c, distances = r[ind], c[ind], distances[ind]
-
-    # Construct K-NN graph
     if binarize is True:
         A = sparse.csr_matrix((np.ones_like(distances), (r, c)), shape=(N, N))
-        A = A + A.T
     else:
-        # Sort the neighbors in descending order of edge weights
         A = sparse.csr_matrix((np.exp(-distances), (r, c)), shape=(N, N))
+
+    if symmetrize:
         A = A + A.T
+        if binarize:
+            A.data = np.ones_like(A.data)
+
+    # Sort neighbors in order of edge weights
+    if binarize is False:
         for i in range(A.shape[0]):
             w = A.data[A.indptr[i] : A.indptr[i + 1]]
             nei = A.indices[A.indptr[i] : A.indptr[i + 1]]
