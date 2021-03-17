@@ -44,9 +44,11 @@ def make_knn_graph(emb, k=5, binarize=True):
     # Construct K-NN graph
     if binarize is True:
         A = sparse.csr_matrix((np.ones_like(distances), (r, c)), shape=(N, N))
+        A = A + A.T
     else:
         # Sort the neighbors in descending order of edge weights
         A = sparse.csr_matrix((np.exp(-distances), (r, c)), shape=(N, N))
+        A = A + A.T
         for i in range(A.shape[0]):
             w = A.data[A.indptr[i] : A.indptr[i + 1]]
             nei = A.indices[A.indptr[i] : A.indptr[i + 1]]
