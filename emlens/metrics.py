@@ -26,6 +26,9 @@ def make_knn_graph(emb, k=5, binarize=True):
         >>> emb = np.random.randn(100, 20)
         >>> A = emlens.make_knn_graph(emb, k = 10)
     """
+    if emb.flags["C_CONTIGUOUS"]:
+        emb = emb.copy(order="C")
+
     # Find the nearest neighbors
     index = faiss.IndexFlatL2(emb.shape[1])
     index.add(emb.astype(np.float32))
