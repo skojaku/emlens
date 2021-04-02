@@ -5,6 +5,7 @@ import numpy as np
 from scipy import sparse, stats
 from sklearn import metrics as skmetrics
 from sklearn.model_selection import KFold
+from sklearn.preprocessing import StandardScaler
 
 
 def make_knn_graph(emb, k=5, binarize=True):
