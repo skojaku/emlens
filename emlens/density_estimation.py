@@ -42,7 +42,8 @@ def estimate_pdf(target, emb, C=0.1):
     n = emb.shape[0]
     dim = emb.shape[1]
 
-    k = np.maximum(1, int(np.round(C * np.power(n, 4 / 5))))
+    k = np.maximum(1, np.round(C * np.power(n, 4 / 5)))
+    k = int(k)
 
     # Construct the knn graph
     index = faiss.IndexFlatL2(dim)
