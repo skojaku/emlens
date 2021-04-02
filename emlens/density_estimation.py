@@ -13,7 +13,7 @@ def estimate_pdf(target, emb, C=0.1):
     :param emb: Embedding vectors for the entities
     :type emb: numpy.ndarray, (num_entities, dim)
     :param C: Bandwidth for kernels. Ranges between (0,1]. Roughly C * num_entities nearest neighbors will be used for estimating the density at a single target location.
-    :type C: str, optional
+    :type C: float, optional
     :return: Log-density of points at the target locations.
     :rtype: numpy.ndarray (num_target,)
 
@@ -29,9 +29,20 @@ def estimate_pdf(target, emb, C=0.1):
         >>> target = np.random.randn(10, 20)
         >>> density = emlens.estimate_pdf(target=target, emb = emb)
     """
+    if len(emb.shape) != 2:
+        raise TypeError(
+            "emb should be 2D numpy array of size (number of points, dimensions)"
+        )
+
+    if len(target.shape) != 2:
+        raise TypeError(
+            "target should be 2D numpy array of size (number of points, dimensions)"
+        )
+
     n = emb.shape[0]
     dim = emb.shape[1]
-    k = int(np.round(C * np.power(n, 4 / 5)))
+
+    k = np.maximum(1, int(np.round(C * np.power(n, 4 / 5))))
 
     # Construct the knn graph
     index = faiss.IndexFlatL2(dim)
