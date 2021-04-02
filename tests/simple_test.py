@@ -65,6 +65,9 @@ class TestCalc(unittest.TestCase):
 
     def test_estimate_pdf(self):
         emlens.estimate_pdf(target=self.emb, emb=self.emb, C=0.1)
+        a = np.array([1, 2, 3])
+        b = np.array([[1, 2, 3], [1, 2, 3]])
+        emlens.estimate_pdf(target=a.reshape((1, -1)), emb=b, C=0.1)
 
     def calculate_rog(self):
         emlens.radius_of_gyration(self.emb, "euc")
