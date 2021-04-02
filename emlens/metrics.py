@@ -494,7 +494,7 @@ def pairwise_distance(emb, group_ids):
     return D, groups
 
 
-def rog(emb, center=None, metric="euc"):
+def rog(emb, metric="euc", center=None):
     """Calculate the radius of gyration (ROG) for the embedding vectors. The
     ROG is a standard deviation of distance of points from a center point. See
     https://en.wikipedia.org/wiki/Radius_of_gyration.
@@ -526,8 +526,45 @@ def rog(emb, center=None, metric="euc"):
     elif metric == "cos":
         center = center / np.linalg.norm(center)
         emb = (emb.T / np.array(np.linalg.norm(emb, axis=1)).reshape(-1)).T
+
         d = 1 - emb @ center
         rog = np.sqrt(np.mean(d ** 2))
     else:
         raise NotImplementedError("rog does not support metric: {}".format(metric))
     return rog
+
+
+def effective_dimension(emb, q=1, normalize=False, is_cov=False):
+    """Effective dimensionality of a set of points in space.
+
+    Effection dimensionality is the number of orthogonal dimensions needed to capture the overall correlational structure of data.
+    See Del Giudice, M. (2020). Effective Dimensionality: A Tutorial. _Multivariate Behavioral Research, 0(0), 1–16. https://doi.org/10.1080/00273171.2020.1743631.
+
+    :param emb: embedding vectors
+    :type emb: numpy.ndarray (num_entities, dim)
+    :param q: Parameter for the Renyi entropy function, defaults to 1
+    :type q: int, optional
+    :param normalize: Set True to center data. For spherical or quasi-spherical data (such as the embedding by word2vec), normalize=False is recommended, defaults to False
+    :type normalize: bool, optional
+    :param is_cov: Set True if `emb` is the covariance matrix, defaults to False
+    :type is_cov: bool, optional
+    :return: effective dimensionality
+    :rtype: float
+    """
+    if is_cov:
+        Cov = emb
+    else:
+        if normalize:
+            emb = StandardScaler().fit_transform(emb)
+        Cov = (emb.T @ emb) / emb.shape[0]
+    lam, _ = np.linalg.eig(Cov)
+    lam = np.real(lam)
+    lam = np.maximum(lam, 1e-10)
+    p = lam / np.sum(lam)
+    p = p[p > 0]
+    if q == 1:
+        return np.exp(stats.entropy(p))
+    elif np.isinf(q):
+        return -np.log(np.max(p))
+    else:
+        return np.log(np.sum(np.power(p, q))) / (1 - q)
