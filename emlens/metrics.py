@@ -514,7 +514,7 @@ def rog(emb, metric="euc", center=None):
         >>> import emlens
         >>> import numpy as np
         >>> emb = np.random.randn(100, 20)
-        >>> rog = emlens.pairwise_metric(emb, 'cos')
+        >>> rog = emlens.rog(emb, 'cos')
     """
 
     if center is None:
@@ -550,6 +550,15 @@ def effective_dimension(emb, q=1, normalize=False, is_cov=False):
     :type is_cov: bool, optional
     :return: effective dimensionality
     :rtype: float
+
+
+    .. highlight:: python
+    .. code-block:: python
+
+        >>> import emlens
+        >>> import numpy as np
+        >>> emb = np.random.randn(100, 20)
+        >>> ed = emlens.effective_dimension(emb)
     """
     if is_cov:
         Cov = emb
