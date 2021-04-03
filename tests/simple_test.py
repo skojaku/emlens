@@ -69,9 +69,12 @@ class TestCalc(unittest.TestCase):
         b = np.array([[1, 2, 3], [1, 2, 3]])
         emlens.estimate_pdf(target=a.reshape((1, -1)), emb=b, C=0.1)
 
-    def calculate_rog(self):
-        emlens.radius_of_gyration(self.emb, "euc")
-        emlens.radius_of_gyration(self.emb, "cos")
+    def test_calculate_rog(self):
+        emlens.rog(self.emb, "euc")
+        emlens.rog(self.emb, "cos")
+
+    def test_effective_dimensionality(self):
+        emlens.effective_dimension(self.emb, q=1)
 
 
 if __name__ == "__main__":
