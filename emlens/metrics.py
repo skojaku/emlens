@@ -2,8 +2,9 @@ from functools import partial
 
 import faiss
 import numpy as np
-from scipy import sparse, stats
+from scipy import linalg, sparse, stats
 from sklearn import metrics as skmetrics
+from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 
@@ -299,14 +300,85 @@ def f1_score(emb, target, agg="mode", **params):
     return knn_pred_score(emb, _target, scoring_func=scoring_func, agg=agg, **params)
 
 
-def r2_score(emb, target, agg="mean", **params):
+def r2_score(emb, target, model="linear", **params):
     """Measuring the prediction performance based on the K-Nearest Neighbor
-    Graph.
+    Graph or Linear Regression.
 
-    Equivalent to knn_pred_score(emb, target, target_type = "cont").
+    If model == "knn", this is quivalent to knn_pred_score(emb, target, target_type = "cont").
+
+    :param emb: embedding vectors
+    :type emb: numpy.ndarray (num_entities, dim)
+    :param target: target variable to predict
+    :type target: numpy.ndarray (num_target,)
+    :param model: model to predict node attributes. With model="linear", the prediction is based on a linear regression model that predicts targets from the given embedding. With model="knn"i, the prediction is based on k-nearest neighbor graphs.
+    :type model:str
+    :return: performance score
+    :rtype: float
     """
-    scoring_func = skmetrics.r2_score
-    return knn_pred_score(emb, target, scoring_func=scoring_func, agg=agg, **params)
+    if model == "knn":
+        scoring_func = skmetrics.r2_score
+        return knn_pred_score(
+            emb, target, scoring_func=scoring_func, agg="mean", **params
+        )
+    elif model == "linear":
+        return linear_pred_score(emb, target, **params)
+
+
+def linear_pred_score(
+    emb, target, n_splits=10, iteration=1, return_all_scores=False,
+):
+    """Measuring the prediction performance based on a linear regression model.
+
+    This function measures how well the embedding space can predict the metadata of entities using the linear regression model.
+    To this end, the following K-folds cross validation is performed:
+    0. Split all entities into K groups.
+    1. Take one group as a test set and the other groups as a training set
+    2. Using the training set, predict the `target` variable for the entities in the training set using a linear regression model.
+    3. Calculate the prediction accuracy
+    4. Repeat Steps 1-3 such that each group is used as the test set once.
+    5. Compute the average of the prediction accuracy computed in Step 3.
+
+    The performance score is measured based on the micro R^2 score.
+
+    :param emb: embedding vectors
+    :type emb: numpy.ndarray (num_entities, dim)
+    :param target: target variable to predict
+    :type target: numpy.ndarray (num_target,)
+    :param n_splits: Number of folds, defaults to 10
+    :type n_splits: int, optional
+    :param iteration: Number of rounds of the cross validation. If iteration>1, the average of the cross validation score will be returned., defaults to 1.
+    :type iteration: int
+    :param return_all_scores: "return_all_scores=True" or "=False" to return all scores in the cross validations or not, respectively.
+    :type  return_all_scores: bool
+    :return: performance score
+    :rtype: float
+    """
+    scores = []
+    all_score = []
+    for _i in range(iteration):
+        kf = KFold(n_splits=n_splits)
+        _scores = []
+        for train_index, test_index in kf.split(target):
+            x_train = emb[train_index, :]
+            x_test = emb[test_index, :]
+            y_train = target[train_index]
+            y_test = target[test_index]
+
+            # Train
+            reg = LinearRegression().fit(x_train, y_train)
+            _score = reg.score(x_test, y_test)
+
+            if np.isnan(_score):
+                continue
+            _scores += [_score]
+            all_score += [_score]
+
+        scores += [np.mean(_scores)]
+    score = np.mean(scores)
+    if return_all_scores:
+        return all_score
+    else:
+        return score
 
 
 def knn_pred_score(
@@ -318,7 +390,7 @@ def knn_pred_score(
     k=10,
     n_splits=10,
     iteration=1,
-    return_scores=False,
+    return_all_scores=False,
 ):
     """Measuring the prediction performance based on the K-Nearest Neighbor
     Graph.
@@ -352,6 +424,8 @@ def knn_pred_score(
     :type n_splits: int, optional
     :param iteration: Number of rounds of the cross validation. If iteration>1, the average of the cross validation score will be returned., defaults to 1.
     :type iteration: int
+    :param return_all_scores: "return_all_scores=True" or "=False" to return all scores in the cross validations or not, respectively.
+    :type  return_all_scores: bool
     :return: performance score
     :rtype: float
     """
@@ -405,8 +479,8 @@ def knn_pred_score(
 
         scores += [np.mean(_scores)]
     score = np.mean(scores)
-    if return_scores:
-        return score, all_score
+    if return_all_scores:
+        return all_score
     else:
         return score
 
@@ -567,7 +641,7 @@ def effective_dimension(emb, q=1, normalize=False, is_cov=False):
         if normalize:
             emb = StandardScaler().fit_transform(emb)
         Cov = (emb.T @ emb) / emb.shape[0]
-    lam, _ = np.linalg.eig(Cov)
+    lam = linalg.eigvalsh(Cov)
     lam = np.real(lam)
     lam = np.maximum(lam, 1e-10)
     p = lam / np.sum(lam)

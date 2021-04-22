@@ -49,8 +49,11 @@ class TestCalc(unittest.TestCase):
 
     def test_knn_pred_score_from_net(self):
         A = emlens.make_knn_graph(self.emb, k=40, binarize=False)
-        emlens.r2_score(self.emb, self.membership, A=A)
+        emlens.r2_score(self.emb, self.membership, A=A, model="knn")
         emlens.f1_score(self.emb, self.membership, A=A)
+
+    def test_r2score_from_net(self):
+        emlens.r2_score(self.emb, self.membership, model="linear")
 
     def test_element_sim(self):
         emlens.element_sim(self.emb, self.membership)
