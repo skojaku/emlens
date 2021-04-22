@@ -338,7 +338,7 @@ def linear_pred_score(
     4. Repeat Steps 1-3 such that each group is used as the test set once.
     5. Compute the average of the prediction accuracy computed in Step 3.
 
-    The performance score is measured based on the micro R^2 score.
+    The performance score is measured based on the R^2 score.
 
     :param emb: embedding vectors
     :type emb: numpy.ndarray (num_entities, dim)
