@@ -1,3 +1,4 @@
+import numbers
 from functools import partial
 
 import faiss
@@ -10,6 +11,48 @@ from sklearn.preprocessing import StandardScaler
 
 
 def make_knn_graph(emb, k=5, binarize=True, metric="euclidean"):
+    """Construct the k-nearest neighbor graph from the embedding vectors.
+
+    :param emb: embedding vectors
+    :type emb: numpy.ndarray (num_entities, dim)
+    :param k: Number of nearest neighbors. If list or array is given, then construct a k-nearest neighbor graph for each k, defaults to 5
+    :type k: int or iterable, optional
+    :param binarize: `binarize=False` will set the weight of the between nodes i and j  by exp(-d_{ij]}). `binarize=True` will set to one., defaults to True
+    :paramm metric: Distance metric for finding nearest neighbors. Available metric `metric="euclidean"`, `metric="cosine"` , `metric="dotsim"`
+    :type metric: str
+    :return: The adjacency matrix of the k-nearest neighbor graph
+    :rtype: sparse.csr_matrix
+
+    .. highlight:: python
+    .. code-block:: python
+
+        >>> import emlens
+        >>> import numpy as np
+        >>> emb = np.random.randn(100, 20)
+        >>> A = emlens.make_knn_graph(emb, k = 10)
+    """
+
+    if isinstance(k, numbers.Number):
+        return _make_knn_graph(emb=emb, k=k, binarize=binarize, metric=metric)
+    else:
+        kmax = int(np.max(k))
+        Ann = _make_knn_graph(emb=emb, k=kmax, binarize=False, metric=metric)
+        retval = []
+        for n in np.sort(k):
+            if n == kmax:
+                continue
+            A = Ann.copy()
+            for i in range(A.shape[0]):
+                A.data[(A.indptr[i] + n) : A.indptr[i + 1]] = 0
+            A.eliminate_zeros()
+            if binarize:
+                A.data = np.ones_like(A.data)
+            retval += [{"A": A, "k": n}]
+        retval += [{"A": Ann, "k": kmax}]
+        return retval
+
+
+def _make_knn_graph(emb, k=5, binarize=True, metric="euclidean"):
     """Construct the k-nearest neighbor graph from the embedding vectors.
 
     :param emb: embedding vectors
@@ -53,18 +96,18 @@ def make_knn_graph(emb, k=5, binarize=True, metric="euclidean"):
     N = emb.shape[0]
 
     # Remove multi edges
-    pair_ids = np.maximum(r, c) + np.minimum(r, c) * N
-    _, ind = np.unique(pair_ids, return_index=True)
-    r, c, distances = r[ind], c[ind], distances[ind]
+    # pair_ids = np.maximum(r, c) + np.minimum(r, c) * N
+    # _, ind = np.unique(pair_ids, return_index=True)
+    # r, c, distances = r[ind], c[ind], distances[ind]
 
     # Construct K-NN graph
     if binarize is True:
         A = sparse.csr_matrix((np.ones_like(distances), (r, c)), shape=(N, N))
-        A = A + A.T
+    #        A = A + A.T
     else:
         # Sort the neighbors in descending order of edge weights
         A = sparse.csr_matrix((np.exp(-distances), (r, c)), shape=(N, N))
-        A = A + A.T
+        #       A = A + A.T
         for i in range(A.shape[0]):
             w = A.data[A.indptr[i] : A.indptr[i + 1]]
             nei = A.indices[A.indptr[i] : A.indptr[i + 1]]

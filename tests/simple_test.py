@@ -33,6 +33,7 @@ class TestCalc(unittest.TestCase):
     def test_make_knn_graph(self):
         emlens.make_knn_graph(self.emb)
         emlens.make_knn_graph(self.emb, k=40, binarize=False)
+        emlens.make_knn_graph(self.emb, k=[3, 10, 20, 100], binarize=True)
 
     def test_assortativity(self):
         for metric in ["euclidean", "cosine", "dotsim"]:
