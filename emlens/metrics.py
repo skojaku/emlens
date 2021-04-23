@@ -75,7 +75,7 @@ def make_knn_graph(emb, k=5, binarize=True, metric="euclidean"):
     return A
 
 
-def assortativity(emb, y, A=None, k=5):
+def assortativity(emb, y, A=None, k=5, metric="euclidean"):
     """Calculate the assortativity of `y` for close entities in the embedding
     space. A positive/negative assortativity indicates that the close entities
     tend to have a similar/dissimilar `y`. Zero assortativity means `y` is
@@ -89,6 +89,8 @@ def assortativity(emb, y, A=None, k=5):
     :type A: scipy.csr_matrix, optional
     :param k: Number of the nearest neighbors, defaults to 5
     :type k: int, optional
+    :paramm metric: Distance metric for finding nearest neighbors. Available metric `metric="euclidean"`, `metric="cosine"` , `metric="dotsim"`
+    :type metric: str
     :return: assortativity
     :rtype: float
 
@@ -107,7 +109,7 @@ def assortativity(emb, y, A=None, k=5):
     """
 
     if A is None:
-        A = make_knn_graph(emb, k=k)
+        A = make_knn_graph(emb, k=k, metric=metric)
     r, c, v = sparse.find(A)
 
     return stats.pearsonr(y[r], y[c])[0]
