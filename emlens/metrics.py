@@ -80,7 +80,7 @@ def _make_knn_graph(emb, k=5, binarize=True, metric="euclidean"):
     if metric == "euclidean":
         index = faiss.IndexFlatL2(emb.shape[1])
     elif metric == "cosine":
-        emb = np.diag(1 / np.linalg.norm(emb, axis=1)) @ emb
+        emb = sparse.diags(1 / np.linalg.norm(emb, axis=1)) @ emb
         index = faiss.IndexFlatL2(emb.shape[1])
     elif metric == "dotsim":
         index = faiss.IndexFlatIP(emb.shape[1])
