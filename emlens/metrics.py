@@ -1,3 +1,4 @@
+import numbers
 from functools import partial
 
 import faiss
@@ -9,7 +10,49 @@ from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 
 
-def make_knn_graph(emb, k=5, binarize=True):
+def make_knn_graph(emb, k=5, binarize=True, metric="euclidean"):
+    """Construct the k-nearest neighbor graph from the embedding vectors.
+
+    :param emb: embedding vectors
+    :type emb: numpy.ndarray (num_entities, dim)
+    :param k: Number of nearest neighbors. If list or array is given, then construct a k-nearest neighbor graph for each k, defaults to 5
+    :type k: int or iterable, optional
+    :param binarize: `binarize=False` will set the weight of the between nodes i and j  by exp(-d_{ij]}). `binarize=True` will set to one., defaults to True
+    :paramm metric: Distance metric for finding nearest neighbors. Available metric `metric="euclidean"`, `metric="cosine"` , `metric="dotsim"`
+    :type metric: str
+    :return: The adjacency matrix of the k-nearest neighbor graph
+    :rtype: sparse.csr_matrix
+
+    .. highlight:: python
+    .. code-block:: python
+
+        >>> import emlens
+        >>> import numpy as np
+        >>> emb = np.random.randn(100, 20)
+        >>> A = emlens.make_knn_graph(emb, k = 10)
+    """
+
+    if isinstance(k, numbers.Number):
+        return _make_knn_graph(emb=emb, k=k, binarize=binarize, metric=metric)
+    else:
+        kmax = int(np.max(k))
+        Ann = _make_knn_graph(emb=emb, k=kmax, binarize=False, metric=metric)
+        retval = []
+        for n in np.sort(k):
+            if n == kmax:
+                continue
+            A = Ann.copy()
+            for i in range(A.shape[0]):
+                A.data[(A.indptr[i] + n) : A.indptr[i + 1]] = 0
+            A.eliminate_zeros()
+            if binarize:
+                A.data = np.ones_like(A.data)
+            retval += [{"A": A, "k": n}]
+        retval += [{"A": Ann, "k": kmax}]
+        return retval
+
+
+def _make_knn_graph(emb, k=5, binarize=True, metric="euclidean"):
     """Construct the k-nearest neighbor graph from the embedding vectors.
 
     :param emb: embedding vectors
@@ -17,6 +60,8 @@ def make_knn_graph(emb, k=5, binarize=True):
     :param k: Number of nearest neighbors, defaults to 5
     :type k: int, optional
     :param binarize: `binarize=False` will set the weight of the between nodes i and j  by exp(-d_{ij]}). `binarize=True` will set to one., defaults to True
+    :paramm metric: Distance metric for finding nearest neighbors. Available metric `metric="euclidean"`, `metric="cosine"` , `metric="dotsim"`
+    :type metric: str
     :return: The adjacency matrix of the k-nearest neighbor graph
     :rtype: sparse.csr_matrix
 
@@ -32,7 +77,16 @@ def make_knn_graph(emb, k=5, binarize=True):
         emb = emb.copy(order="C")
 
     # Find the nearest neighbors
-    index = faiss.IndexFlatL2(emb.shape[1])
+    if metric == "euclidean":
+        index = faiss.IndexFlatL2(emb.shape[1])
+    elif metric == "cosine":
+        emb = sparse.diags(1 / np.linalg.norm(emb, axis=1)) @ emb
+        index = faiss.IndexFlatL2(emb.shape[1])
+    elif metric == "dotsim":
+        index = faiss.IndexFlatIP(emb.shape[1])
+    else:
+        raise NotImplementedError("does not support metric: {}".format(metric))
+
     index.add(emb.astype(np.float32))
     distances, indices = index.search(emb.astype(np.float32), k=k)
     r = np.outer(np.arange(indices.shape[0]), np.ones((1, k))).astype(int)
@@ -42,18 +96,18 @@ def make_knn_graph(emb, k=5, binarize=True):
     N = emb.shape[0]
 
     # Remove multi edges
-    pair_ids = np.maximum(r, c) + np.minimum(r, c) * N
-    _, ind = np.unique(pair_ids, return_index=True)
-    r, c, distances = r[ind], c[ind], distances[ind]
+    # pair_ids = np.maximum(r, c) + np.minimum(r, c) * N
+    # _, ind = np.unique(pair_ids, return_index=True)
+    # r, c, distances = r[ind], c[ind], distances[ind]
 
     # Construct K-NN graph
     if binarize is True:
         A = sparse.csr_matrix((np.ones_like(distances), (r, c)), shape=(N, N))
-        A = A + A.T
+    #        A = A + A.T
     else:
         # Sort the neighbors in descending order of edge weights
         A = sparse.csr_matrix((np.exp(-distances), (r, c)), shape=(N, N))
-        A = A + A.T
+        #       A = A + A.T
         for i in range(A.shape[0]):
             w = A.data[A.indptr[i] : A.indptr[i + 1]]
             nei = A.indices[A.indptr[i] : A.indptr[i + 1]]
@@ -64,7 +118,7 @@ def make_knn_graph(emb, k=5, binarize=True):
     return A
 
 
-def assortativity(emb, y, A=None, k=5):
+def assortativity(emb, y, A=None, k=5, metric="euclidean"):
     """Calculate the assortativity of `y` for close entities in the embedding
     space. A positive/negative assortativity indicates that the close entities
     tend to have a similar/dissimilar `y`. Zero assortativity means `y` is
@@ -78,6 +132,8 @@ def assortativity(emb, y, A=None, k=5):
     :type A: scipy.csr_matrix, optional
     :param k: Number of the nearest neighbors, defaults to 5
     :type k: int, optional
+    :paramm metric: Distance metric for finding nearest neighbors. Available metric `metric="euclidean"`, `metric="cosine"` , `metric="dotsim"`
+    :type metric: str
     :return: assortativity
     :rtype: float
 
@@ -96,13 +152,13 @@ def assortativity(emb, y, A=None, k=5):
     """
 
     if A is None:
-        A = make_knn_graph(emb, k=k)
+        A = make_knn_graph(emb, k=k, metric=metric)
     r, c, v = sparse.find(A)
 
     return stats.pearsonr(y[r], y[c])[0]
 
 
-def modularity(emb, group_ids, A=None, k=10):
+def modularity(emb, group_ids, A=None, k=10, metric="euclidean"):
     """Calculate the modularity of entities with group membership. The
     modularity ranges between [-1,1], where a positive modularity indicates
     that nodes with the same group membership tend to be close each other. Zero
@@ -117,6 +173,8 @@ def modularity(emb, group_ids, A=None, k=10):
     :type A: scipy.csr_matrix, optional
     :param k: Number of the nearest neighbors, defaults to 10
     :type k: int, optional
+    :paramm metric: Distance metric for finding nearest neighbors. Available metric `metric="euclidean"`, `metric="cosine"` , `metric="dotsim"`
+    :type metric: str
     :return: modularity
     :rtype: float
 
@@ -131,7 +189,7 @@ def modularity(emb, group_ids, A=None, k=10):
     """
 
     if A is None:
-        A = make_knn_graph(emb, k=k)
+        A = make_knn_graph(emb, k=k, metric=metric)
     r, c, v = sparse.find(A)
 
     deg = np.array(A.sum(axis=0))
@@ -145,7 +203,7 @@ def modularity(emb, group_ids, A=None, k=10):
     return Q
 
 
-def nmi(emb, group_ids, A=None, k=10):
+def nmi(emb, group_ids, A=None, k=10, metric="euclidean"):
     """Calculate the Normalized Mutual Information for the entities with group
     membership. The NMI stands for the Normalized Mutual Information and takes
     a value between [0,1]. A larger NMI indicates that nodes with the same
@@ -165,6 +223,8 @@ def nmi(emb, group_ids, A=None, k=10):
     :type A: scipy.csr_matrix, optional
     :param k: Number of the nearest neighbors, defaults to 10
     :type k: int, optional
+    :paramm metric: Distance metric for finding nearest neighbors. Available metric `metric="euclidean"`, `metric="cosine"` , `metric="dotsim"`
+    :type metric: str
     :return: normalized mutual information
     :rtype: float
 
@@ -178,7 +238,7 @@ def nmi(emb, group_ids, A=None, k=10):
         >>> rho = emlens.nmi(emb, g)
     """
     if A is None:
-        A = make_knn_graph(emb, k=k)
+        A = make_knn_graph(emb, k=k, metric=metric)
 
     # Assign integers to group ids
     _, cids = np.unique(group_ids, return_inverse=True)
@@ -204,7 +264,7 @@ def nmi(emb, group_ids, A=None, k=10):
     return Q
 
 
-def element_sim(emb, group_ids, A=None, k=10):
+def element_sim(emb, group_ids, A=None, k=10, metric="euclidean"):
     """Calculate the Element Centric Clustering Similarity for the entities
     with group membership.
 
@@ -244,7 +304,7 @@ def element_sim(emb, group_ids, A=None, k=10):
         >>> rho = emlens.element_sim(emb, g)
     """
     if A is None:
-        A = make_knn_graph(emb, k=k)
+        A = make_knn_graph(emb, k=k, metric=metric)
 
     # Assign integers to group ids
     _, cids = np.unique(group_ids, return_inverse=True)
@@ -385,6 +445,7 @@ def knn_pred_score(
     emb,
     target,
     scoring_func,
+    metric="euclidean",
     agg="mode",
     A=None,
     k=10,
@@ -413,6 +474,8 @@ def knn_pred_score(
     :type target: numpy.ndarray (num_target,)
     :param scoring_func: scoring function. This function will take a target variable `y` as the first argumebt and predicted variable `ypred` as the second argumebt, and ouputs the prediction score `score`, i.e., score=scoring_func(y, ypred).
     :type scoring_func: numpy func
+    :paramm metric: Distance metric for finding nearest neighbors. Available metric `metric="euclidean"`, `metric="cosine"` , `metric="dotsim"`
+    :type metric: str
     :paramm agg: How to aggregate the neighbors' variables. Setting `aggregation='mode'` uses the most frequent label, `='mean'` uses the mean as the predicted variable.
                  If there are more than k neighbors, aggregate the k neighbors connected by the edges with the largest weights, defaults to 'mode'
     :type agg: str
@@ -431,7 +494,7 @@ def knn_pred_score(
     """
 
     if A is None:
-        A = make_knn_graph(emb, k=k)
+        A = make_knn_graph(emb, k=k, metric=metric)
 
     scores = []
     all_score = []

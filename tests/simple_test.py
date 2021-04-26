@@ -33,30 +33,37 @@ class TestCalc(unittest.TestCase):
     def test_make_knn_graph(self):
         emlens.make_knn_graph(self.emb)
         emlens.make_knn_graph(self.emb, k=40, binarize=False)
+        emlens.make_knn_graph(self.emb, k=[3, 10, 20, 100], binarize=True)
 
     def test_assortativity(self):
-        emlens.assortativity(self.emb, self.deg)
+        for metric in ["euclidean", "cosine", "dotsim"]:
+            emlens.assortativity(self.emb, self.membership, metric=metric)
 
     def test_modularity(self):
-        emlens.modularity(self.emb, self.membership)
+        for metric in ["euclidean", "cosine", "dotsim"]:
+            emlens.modularity(self.emb, self.membership, metric=metric)
 
     def test_nmi(self):
-        emlens.nmi(self.emb, self.membership)
+        for metric in ["euclidean", "cosine", "dotsim"]:
+            emlens.nmi(self.emb, self.membership, metric=metric)
 
     def test_knn_pred_score(self):
-        emlens.r2_score(self.emb, self.membership)
-        emlens.f1_score(self.emb, self.membership)
+        for metric in ["euclidean", "cosine", "dotsim"]:
+            emlens.f1_score(self.emb, self.membership, metric=metric)
 
     def test_knn_pred_score_from_net(self):
         A = emlens.make_knn_graph(self.emb, k=40, binarize=False)
-        emlens.r2_score(self.emb, self.membership, A=A, model="knn")
-        emlens.f1_score(self.emb, self.membership, A=A)
+        for model in ["knn"]:
+            for metric in ["euclidean", "cosine", "dotsim"]:
+                emlens.r2_score(self.emb, self.membership, model=model, metric=metric)
+        emlens.r2_score(self.emb, self.membership, model="linear")
 
     def test_r2score_from_net(self):
         emlens.r2_score(self.emb, self.membership, model="linear")
 
     def test_element_sim(self):
-        emlens.element_sim(self.emb, self.membership)
+        for metric in ["euclidean", "cosine", "dotsim"]:
+            emlens.element_sim(self.emb, self.membership, metric=metric)
 
     def test_pairwise_dot_similarity(self):
         S, _ = emlens.pairwise_dot_sim(self.emb, self.membership)
