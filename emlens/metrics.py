@@ -27,7 +27,6 @@ def make_knn_graph(emb, k=5, binarize=True, metric="euclidean"):
     .. code-block:: python
 
         >>> import emlens
-        >>> import numpy as np
         >>> emb = np.random.randn(100, 20)
         >>> A = emlens.make_knn_graph(emb, k = 10)
     """
@@ -80,7 +79,11 @@ def _make_knn_graph(emb, k=5, binarize=True, metric="euclidean"):
     if metric == "euclidean":
         index = faiss.IndexFlatL2(emb.shape[1])
     elif metric == "cosine":
-        emb = sparse.diags(1 / np.linalg.norm(emb, axis=1)) @ emb
+        denom = np.array(np.linalg.norm(emb, axis=1)).reshape(-1)
+        denom[np.isclose(denom, 0)] = 1
+        emb = np.einsum("i,ij->ij", 1 / denom, emb)
+
+        # emb = sparse.diags(1 / ) @ emb
         index = faiss.IndexFlatL2(emb.shape[1])
     elif metric == "dotsim":
         index = faiss.IndexFlatIP(emb.shape[1])
@@ -95,19 +98,16 @@ def _make_knn_graph(emb, k=5, binarize=True, metric="euclidean"):
     r = r.reshape(-1)
     N = emb.shape[0]
 
-    # Remove multi edges
-    # pair_ids = np.maximum(r, c) + np.minimum(r, c) * N
-    # _, ind = np.unique(pair_ids, return_index=True)
-    # r, c, distances = r[ind], c[ind], distances[ind]
+    s = (r >= 0) & (c >= 0)
+    r, c, distances = r[s], c[s], distances[s]
 
+    # Remove multi edges
     # Construct K-NN graph
     if binarize is True:
         A = sparse.csr_matrix((np.ones_like(distances), (r, c)), shape=(N, N))
-    #        A = A + A.T
     else:
         # Sort the neighbors in descending order of edge weights
         A = sparse.csr_matrix((np.exp(-distances), (r, c)), shape=(N, N))
-        #       A = A + A.T
         for i in range(A.shape[0]):
             w = A.data[A.indptr[i] : A.indptr[i + 1]]
             nei = A.indices[A.indptr[i] : A.indptr[i + 1]]
@@ -353,14 +353,13 @@ def f1_score(emb, target, agg="mode", **params):
 
     Equivalent to knn_pred_score(emb, target, target_type = "disc").
     """
-
     scoring_func = partial(skmetrics.f1_score, average="micro")
     _, _target = np.unique(target, return_inverse=True)
 
     return knn_pred_score(emb, _target, scoring_func=scoring_func, agg=agg, **params)
 
 
-def r2_score(emb, target, model="linear", **params):
+def r2_score(emb, target, model="linear", test=True, **params):
     """Measuring the prediction performance based on the K-Nearest Neighbor
     Graph or Linear Regression.
 
