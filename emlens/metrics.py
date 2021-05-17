@@ -671,7 +671,7 @@ def rog(emb, metric="euc", center=None):
     return rog
 
 
-def effective_dimension(emb, q=1, normalize=False, is_cov=False):
+def effective_dimension(emb, q=1, normalize=False, is_cov=False, return_dim_vec=False):
     """Effective dimensionality of a set of points in space.
 
     Effection dimensionality is the number of orthogonal dimensions needed to capture the overall correlational structure of data.
@@ -685,6 +685,8 @@ def effective_dimension(emb, q=1, normalize=False, is_cov=False):
     :type normalize: bool, optional
     :param is_cov: Set True if `emb` is the covariance matrix, defaults to False
     :type is_cov: bool, optional
+    :param return_dim_vec: Set True to get the vectors of the effective dimensions.
+    :type return_dim_vec: bool, optional
     :return: effective dimensionality
     :rtype: float
 
@@ -703,14 +705,27 @@ def effective_dimension(emb, q=1, normalize=False, is_cov=False):
         if normalize:
             emb = StandardScaler().fit_transform(emb)
         Cov = (emb.T @ emb) / emb.shape[0]
-    lam = linalg.eigvalsh(Cov)
+    if return_dim_vec:
+        lam, v = linalg.eig(Cov)
+    else:
+        lam = linalg.eigvalsh(Cov)
     lam = np.real(lam)
     lam = np.maximum(lam, 1e-10)
     p = lam / np.sum(lam)
     p = p[p > 0]
-    if q == 1:
-        return np.exp(stats.entropy(p))
-    elif np.isinf(q):
-        return -np.log(np.max(p))
+
+    if return_dim_vec:
+        v = v[:, p > 0]
+        if q == 1:
+            return np.exp(stats.entropy(p)), v
+        elif np.isinf(q):
+            return -np.log(np.max(p)), v
+        else:
+            return np.log(np.sum(np.power(p, q))) / (1 - q), v
     else:
-        return np.log(np.sum(np.power(p, q))) / (1 - q)
+        if q == 1:
+            return np.exp(stats.entropy(p))
+        elif np.isinf(q):
+            return -np.log(np.max(p))
+        else:
+            return np.log(np.sum(np.power(p, q))) / (1 - q)
