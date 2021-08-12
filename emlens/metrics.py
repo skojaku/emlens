@@ -10,7 +10,9 @@ from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 
 
-def make_knn_graph(emb, k=5, binarize=True, metric="euclidean", mutual = True, gpu_id = None):
+def make_knn_graph(
+    emb, k=5, binarize=True, metric="euclidean", mutual=True, gpu_id=None
+):
     """Construct the k-nearest neighbor graph from the embedding vectors.
 
     :param emb: embedding vectors
@@ -39,7 +41,9 @@ def make_knn_graph(emb, k=5, binarize=True, metric="euclidean", mutual = True, g
     if kmax >= num_points:
         raise ValueError("Number of neighbors is larger than the number of data points")
 
-    nodes, neighbors, distances = find_nearest_neighbors(emb, emb, k = kmax, gpu_id)
+    nodes, neighbors, distances = find_nearest_neighbors(
+        emb, emb, k=kmax, gpu_id=gpu_id
+    )
 
     retval = []
     for _k in k:
@@ -57,6 +61,7 @@ def make_knn_graph(emb, k=5, binarize=True, metric="euclidean", mutual = True, g
         retval += [{"A": A, "k": _k}]
     return retval
 
+
 def find_mutual_edges(r, c, v=None):
     N = int(np.maximum(np.max(r), np.max(c)) + 1)
     A = sparse.csr_matrix((np.ones_like(r), (r, c)), shape=(N, N))
@@ -73,7 +78,8 @@ def find_mutual_edges(r, c, v=None):
         bv = np.array(W[(br, bc)]).reshape(-1)
         return br, bc, bv
 
-def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id = None):
+
+def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None):
     """Find the nearest neighbors for each point.
 
     :param emb: vectors for the points for which we find the nearest neighbors
@@ -118,14 +124,14 @@ def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id = None):
         res = faiss.StandardGpuResources()
         index = faiss.index_cpu_to_gpu(res, gpu_id, index)
 
-
     index.add(emb.astype(np.float32))
-    neighbors, distances = index.search(emb.astype(np.float32), k=k)
+    neighbors, distances = index.search(target.astype(np.float32), k=k)
     nodes = (np.arange(emb.shape[0]).reshape((-1, 1)) @ np.ones((1, k))).astype(int)
+    neighbors = neighbors.astype(int)
     return nodes, neighbors, distances
 
 
-def assortativity(emb, y, k=5, metric="euclidean", gpu_id):
+def assortativity(emb, y, k=5, metric="euclidean", gpu_id=None):
     """Calculate the assortativity of `y` for close entities in the embedding
     space. A positive/negative assortativity indicates that the close entities
     tend to have a similar/dissimilar `y`. Zero assortativity means `y` is
@@ -158,14 +164,17 @@ def assortativity(emb, y, k=5, metric="euclidean", gpu_id):
         Then, the assortativity is calculated as the Pearson correlation of y between the adjacent nodes.
     """
 
-
     if isinstance(k, numbers.Number):
         k = [k]
 
     scores = []
     for _k in k:
-        nodes, neighbors, _ = find_nearest_neighbors(emb, k=_k, metric = metric, gpu_id = gpu_id)
-        score = stats.pearsonr(y[nodes[:, :_k]].reshape(-1), y[neighbors[:, :_k]].reshape(-1))[0]
+        nodes, neighbors, _ = find_nearest_neighbors(
+            emb, emb, k=_k, metric=metric, gpu_id=gpu_id
+        )
+        score = stats.pearsonr(
+            y[nodes[:, :_k]].reshape(-1), y[neighbors[:, :_k]].reshape(-1)
+        )[0]
         scores.append(score)
 
     if len(scores) == 1:
@@ -173,7 +182,8 @@ def assortativity(emb, y, k=5, metric="euclidean", gpu_id):
 
     return scores
 
-def modularity(emb, group_ids, k=10, metric="euclidean", gpu_id = None):
+
+def modularity(emb, group_ids, k=10, metric="euclidean", gpu_id=None):
     """Calculate the modularity of entities with group membership. The
     modularity ranges between [-1,1], where a positive modularity indicates
     that nodes with the same group membership tend to be close each other. Zero
@@ -211,7 +221,9 @@ def modularity(emb, group_ids, k=10, metric="euclidean", gpu_id = None):
         shape=(gids.size, len(labels)),
     )
 
-    Alist = make_knn_graph(emb, k=k, binarize=True, metric=metric, mutual = True, gpu_id = gpu_id)
+    Alist = make_knn_graph(
+        emb, k=k, binarize=True, metric=metric, mutual=True, gpu_id=gpu_id
+    )
     scores = []
     for row in Alist:
         A = row["A"]
@@ -219,10 +231,14 @@ def modularity(emb, group_ids, k=10, metric="euclidean", gpu_id = None):
         D = np.array(deg.reshape(1, -1) @ U).reshape(-1)
         score = np.trace((U.T @ A @ U) - np.outer(D, D) / np.sum(D)) / np.sum(D)
         scores.append(score)
+
+    if len(scores) == 1:
+        return scores[0]
+
     return scores
 
 
-def nmi(emb, group_ids, A=None, k=10, metric="euclidean", gpu_id = None):
+def nmi(emb, group_ids, A=None, k=10, metric="euclidean", gpu_id=None):
     """Calculate the Normalized Mutual Information for the entities with group
     membership. The NMI stands for the Normalized Mutual Information and takes
     a value between [0,1]. A larger NMI indicates that nodes with the same
@@ -271,7 +287,9 @@ def nmi(emb, group_ids, A=None, k=10, metric="euclidean", gpu_id = None):
         (np.ones_like(cids), (np.arange(cids.size), cids)), shape=(N, K)
     )
 
-    Alist = make_knn_graph(emb, k=k, binarize=True, metric=metric, mutual = True, gpu_id = gpu_id)
+    Alist = make_knn_graph(
+        emb, k=k, binarize=True, metric=metric, mutual=True, gpu_id=gpu_id
+    )
     scores = []
     for row in Alist:
         A = row["A"]
@@ -286,10 +304,13 @@ def nmi(emb, group_ids, A=None, k=10, metric="euclidean", gpu_id = None):
         # Normalize MI
         score = 2 * Irc / (stats.entropy(pr) + stats.entropy(pc))
         scores.append(score)
-        return scores
+
+    if len(scores) == 1:
+        return scores[0]
+    return scores
 
 
-def element_sim(emb, group_ids, A=None, k=10, metric="euclidean"):
+def element_sim(emb, group_ids, A=None, k=10, metric="euclidean", gpu_id=None):
     """Calculate the Element Centric Clustering Similarity for the entities
     with group membership.
 
@@ -336,21 +357,18 @@ def element_sim(emb, group_ids, A=None, k=10, metric="euclidean"):
 
     # Get size
     K = max(cids) + 1
-    N = cids.size
-    M = len(A.data)
 
     # Calculate the joint distribution
-    U = sparse.csr_matrix(
-        (np.ones_like(cids), (np.arange(cids.size), cids)), shape=(N, K)
+    Alist = make_knn_graph(
+        emb, k=k, binarize=True, metric=metric, mutual=True, gpu_id=gpu_id
     )
-
-    Alist = make_knn_graph(emb, k=k, binarize=True, metric=metric, mutual = True, gpu_id = gpu_id)
     scores = []
     for row in Alist:
         A = row["A"]
 
         # Make a list of group memebrships
         r, c, _ = sparse.find(A)
+        M = len(A.data)
         gA, gB = cids[r], cids[c]
 
         # Calculate the element centric similarity
@@ -367,8 +385,12 @@ def element_sim(emb, group_ids, A=None, k=10, metric="euclidean"):
         #   S_i = 0.5 * n_{rc} * ( 1/n^A _{g^A _i} +  1/n^B _{g^B _i} - |1/n^A _{g^A _i} - 1/n^B _{g^B _i}|).
         # Computing this for N nodes requires memory and computation time in order of O(NK), where K is the number of groups.
         # This order can be substantially lower than O(N^2) if K<<N.
-        UA = sparse.csr_matrix((np.ones_like(gA), (np.arange(gA.size), gA)), shape=(M, K))
-        UB = sparse.csr_matrix((np.ones_like(gB), (np.arange(gB.size), gB)), shape=(M, K))
+        UA = sparse.csr_matrix(
+            (np.ones_like(gA), (np.arange(gA.size), gA)), shape=(M, K)
+        )
+        UB = sparse.csr_matrix(
+            (np.ones_like(gB), (np.arange(gB.size), gB)), shape=(M, K)
+        )
 
         fA = np.array(UA.sum(axis=0)).reshape(-1)
         fB = np.array(UB.sum(axis=0)).reshape(-1)
@@ -381,6 +403,8 @@ def element_sim(emb, group_ids, A=None, k=10, metric="euclidean"):
         )
         score = np.mean(Si)
         scores.append(score)
+    if len(scores) == 1:
+        return scores[0]
     return score
 
 
@@ -477,111 +501,180 @@ def linear_pred_score(
         return score
 
 
+# def knn_pred_score(
+#    emb,
+#    target,
+#    scoring_func,
+#    metric="euclidean",
+#    agg="mode",
+#    A=None,
+#    k=10,
+#    n_splits=10,
+#    iteration=1,
+#    return_all_scores=False,
+# ):
+#    """Measuring the prediction performance based on the K-Nearest Neighbor
+#    Graph.
+#
+#    This function measures how well the embedding space can predict the metadata of entities using the K-nearest neighbor graph.
+#    To this end, the following K-folds cross validation is performed:
+#    0. Split all entities into K groups.
+#    1. Take one group as a test set and the other groups as a training set
+#    2. Using the training set, predict the `target` variable for the entities in the training set.
+#    3. Calculate the prediction accuracy
+#    4. Repeat Steps 1-3 such that each group is used as the test set once.
+#    5. Compute the average of the prediction accuracy computed in Step 3.
+#
+#    The performance score is measured based on the micro f1-score for the discrete target variable or R^2 for the continuous target variable.
+#    Other scoring measures can be used by passing the score function as `scoring_func argument`.
+#
+#    :param emb: embedding vectors
+#    :type emb: numpy.ndarray (num_entities, dim)
+#    :param target: target variable to predict
+#    :type target: numpy.ndarray (num_target,)
+#    :param scoring_func: scoring function. This function will take a target variable `y` as the first argumebt and predicted variable `ypred` as the second argumebt, and ouputs the prediction score `score`, i.e., score=scoring_func(y, ypred).
+#    :type scoring_func: numpy func
+#    :paramm metric: Distance metric for finding nearest neighbors. Available metric `metric="euclidean"`, `metric="cosine"` , `metric="dotsim"`
+#    :type metric: str
+#    :paramm agg: How to aggregate the neighbors' variables. Setting `aggregation='mode'` uses the most frequent label, `='mean'` uses the mean as the predicted variable.
+#                 If there are more than k neighbors, aggregate the k neighbors connected by the edges with the largest weights, defaults to 'mode'
+#    :type agg: str
+#    :param A: precomputed adjacency matrix of the graph. If None, a k-nearest neighbor graph will be constructed, defaults to None
+#    :type A: scipy.csr_matrix, optional
+#    :param k: Number of nearest neighbors, defaults to 10
+#    :type k: int, optional
+#    :param n_splits: Number of folds, defaults to 10
+#    :type n_splits: int, optional
+#    :param iteration: Number of rounds of the cross validation. If iteration>1, the average of the cross validation score will be returned., defaults to 1.
+#    :type iteration: int
+#    :param return_all_scores: "return_all_scores=True" or "=False" to return all scores in the cross validations or not, respectively.
+#    :type  return_all_scores: bool
+#    :return: performance score
+#    :rtype: float
+#    """
+#
+#    if A is None:
+#        A = make_knn_graph(emb, k=k, metric=metric)
+#
+#    scores = []
+#    all_score = []
+#    for _i in range(iteration):
+#        kf = KFold(n_splits=n_splits)
+#        _scores = []
+#        for train_index, test_index in kf.split(target):
+#            y_train = target[train_index]
+#            y_test = target[test_index]
+#
+#            # Train
+#            B = sparse.csr_matrix(A[test_index, :][:, train_index])
+#
+#            # Evaluation
+#            y_pred = -np.zeros(len(test_index)) * np.nan
+#            for i in range(B.shape[0]):
+#
+#                # pick neighbors and edge weights
+#                nei = B.indices[B.indptr[i] : B.indptr[i + 1]]
+#
+#                if len(nei) == 0:  # no neighbors, then skip
+#                    continue
+#
+#                neighbors_variables = y_train[nei]
+#
+#                if (
+#                    len(nei) > k
+#                ):  # if more than k neighbors, then pick the k neighbors connected by large edge weights
+#                    w = B.data[B.indptr[i] : B.indptr[i + 1]]
+#                    ind = np.argsort(-w)[:k]
+#                    neighbors_variables = neighbors_variables[ind]
+#
+#                if agg == "mode":
+#                    y_pred[i] = stats.mode(neighbors_variables)[0]
+#                elif agg == "mean":
+#                    y_pred[i] = np.mean(neighbors_variables)
+#            nonnan = ~np.isnan(y_pred)
+#            y_test, y_pred = y_test[nonnan], y_pred[nonnan]
+#            _score = scoring_func(y_test, y_pred)
+#
+#            if np.isnan(_score):
+#                continue
+#            _scores += [_score]
+#            all_score += [_score]
+#
+#        scores += [np.mean(_scores)]
+#    score = np.mean(scores)
+#    if return_all_scores:
+#        return all_score
+#    else:
+#        return score
+
+
 def knn_pred_score(
     emb,
     target,
     scoring_func,
     metric="euclidean",
     agg="mode",
-    A=None,
     k=10,
     n_splits=10,
     iteration=1,
     return_all_scores=False,
+    gpu_id=None
+    # def eval_pred_by_knn(emb, fname, metric, klist, n_splits, gpu_id = 0):
 ):
-    """Measuring the prediction performance based on the K-Nearest Neighbor
-    Graph.
-
-    This function measures how well the embedding space can predict the metadata of entities using the K-nearest neighbor graph.
-    To this end, the following K-folds cross validation is performed:
-    0. Split all entities into K groups.
-    1. Take one group as a test set and the other groups as a training set
-    2. Using the training set, predict the `target` variable for the entities in the training set.
-    3. Calculate the prediction accuracy
-    4. Repeat Steps 1-3 such that each group is used as the test set once.
-    5. Compute the average of the prediction accuracy computed in Step 3.
-
-    The performance score is measured based on the micro f1-score for the discrete target variable or R^2 for the continuous target variable.
-    Other scoring measures can be used by passing the score function as `scoring_func argument`.
-
-    :param emb: embedding vectors
-    :type emb: numpy.ndarray (num_entities, dim)
-    :param target: target variable to predict
-    :type target: numpy.ndarray (num_target,)
-    :param scoring_func: scoring function. This function will take a target variable `y` as the first argumebt and predicted variable `ypred` as the second argumebt, and ouputs the prediction score `score`, i.e., score=scoring_func(y, ypred).
-    :type scoring_func: numpy func
-    :paramm metric: Distance metric for finding nearest neighbors. Available metric `metric="euclidean"`, `metric="cosine"` , `metric="dotsim"`
-    :type metric: str
-    :paramm agg: How to aggregate the neighbors' variables. Setting `aggregation='mode'` uses the most frequent label, `='mean'` uses the mean as the predicted variable.
-                 If there are more than k neighbors, aggregate the k neighbors connected by the edges with the largest weights, defaults to 'mode'
-    :type agg: str
-    :param A: precomputed adjacency matrix of the graph. If None, a k-nearest neighbor graph will be constructed, defaults to None
-    :type A: scipy.csr_matrix, optional
-    :param k: Number of nearest neighbors, defaults to 10
-    :type k: int, optional
-    :param n_splits: Number of folds, defaults to 10
-    :type n_splits: int, optional
-    :param iteration: Number of rounds of the cross validation. If iteration>1, the average of the cross validation score will be returned., defaults to 1.
-    :type iteration: int
-    :param return_all_scores: "return_all_scores=True" or "=False" to return all scores in the cross validations or not, respectively.
-    :type  return_all_scores: bool
-    :return: performance score
-    :rtype: float
-    """
-
-    if A is None:
-        A = make_knn_graph(emb, k=k, metric=metric)
-
+    kf = KFold(n_splits=n_splits, shuffle=True)
     scores = []
-    all_score = []
-    for _i in range(iteration):
-        kf = KFold(n_splits=n_splits)
-        _scores = []
-        for train_index, test_index in kf.split(target):
-            y_train = target[train_index]
-            y_test = target[test_index]
+    for _, (train_index, test_index) in enumerate(kf.split(target)):
 
-            # Train
-            B = sparse.csr_matrix(A[test_index, :][:, train_index])
+        train_emb = emb[train_index, :]
+        test_emb = emb[test_index, :]
+        train_labels = target[train_index]
+        test_labels = target[test_index]
 
-            # Evaluation
-            y_pred = -np.zeros(len(test_index)) * np.nan
-            for i in range(B.shape[0]):
+        pred_k = make_knn_pred(
+            test_emb,
+            train_emb,
+            train_labels=train_labels,
+            klist=k,
+            agg=agg,
+            metric=metric,
+            gpu_id=gpu_id,
+        )
 
-                # pick neighbors and edge weights
-                nei = B.indices[B.indptr[i] : B.indptr[i + 1]]
+        for k, pred in pred_k.items():
+            score = scoring_func(test_labels, pred)
+            scores.append({"score": score, "k": k})
+    return scores
 
-                if len(nei) == 0:  # no neighbors, then skip
-                    continue
 
-                neighbors_variables = y_train[nei]
+def make_knn_pred(
+    target, emb, train_labels, klist, agg="mode", metric="euclidean", gpu_id=None
+):
 
-                if (
-                    len(nei) > k
-                ):  # if more than k neighbors, then pick the k neighbors connected by large edge weights
-                    w = B.data[B.indptr[i] : B.indptr[i + 1]]
-                    ind = np.argsort(-w)[:k]
-                    neighbors_variables = neighbors_variables[ind]
+    if isinstance(klist, numbers.Number):
+        klist = [klist]
 
-                if agg == "mode":
-                    y_pred[i] = stats.mode(neighbors_variables)[0]
-                elif agg == "mean":
-                    y_pred[i] = np.mean(neighbors_variables)
-            nonnan = ~np.isnan(y_pred)
-            y_test, y_pred = y_test[nonnan], y_pred[nonnan]
-            _score = scoring_func(y_test, y_pred)
+    # Train
+    kmax = int(np.max(klist))
+    _, indices, distances = find_nearest_neighbors(
+        target, emb, k=kmax, metric=metric, gpu_id=gpu_id
+    )
 
-            if np.isnan(_score):
-                continue
-            _scores += [_score]
-            all_score += [_score]
-
-        scores += [np.mean(_scores)]
-    score = np.mean(scores)
-    if return_all_scores:
-        return all_score
+    # Agrgegation
+    pred_k = {}
+    if agg == "mode":
+        train_label_names, train_label_ids = np.unique(
+            train_labels, return_inverse=True
+        )
+        X = train_label_ids[indices]
+        for k in klist:
+            y_pred = stats.mode(X[:, :k], axis=1)[0].reshape(-1)
+            pred_k[k] = train_label_names[y_pred]
     else:
-        return score
+        X = train_labels[indices]
+        for k in klist:
+            y_pred = np.array(X[:, :k].mean(axis=1)).reshape(-1)
+            pred_k[k] = y_pred
+    return pred_k
 
 
 def pairwise_dot_sim(emb, group_ids):
