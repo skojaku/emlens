@@ -1,4 +1,4 @@
-faiss-cpu
+faiss-gpu
 numba
 numpy
 scikit-learn
