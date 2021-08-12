@@ -10,7 +10,7 @@ from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 
 
-def make_knn_graph(emb, k=5, binarize=True, metric="euclidean"):
+def make_knn_graph(emb, k=5, binarize=True, metric="euclidean", mutual = True, gpu_id = None):
     """Construct the k-nearest neighbor graph from the embedding vectors.
 
     :param emb: embedding vectors
@@ -30,39 +30,62 @@ def make_knn_graph(emb, k=5, binarize=True, metric="euclidean"):
         >>> emb = np.random.randn(100, 20)
         >>> A = emlens.make_knn_graph(emb, k = 10)
     """
-
     if isinstance(k, numbers.Number):
-        return _make_knn_graph(emb=emb, k=k, binarize=binarize, metric=metric)
-    else:
-        kmax = int(np.max(k))
-        Ann = _make_knn_graph(emb=emb, k=kmax, binarize=False, metric=metric)
-        retval = []
-        for n in np.sort(k):
-            if n == kmax:
-                continue
-            A = Ann.copy()
-            for i in range(A.shape[0]):
-                A.data[(A.indptr[i] + n) : A.indptr[i + 1]] = 0
-            A.eliminate_zeros()
-            if binarize:
-                A.data = np.ones_like(A.data)
-            retval += [{"A": A, "k": n}]
-        retval += [{"A": Ann, "k": kmax}]
-        return retval
+        k = [k]
 
+    kmax = int(np.max(k))
+    num_points = emb.shape[0]
 
-def _make_knn_graph(emb, k=5, binarize=True, metric="euclidean"):
-    """Construct the k-nearest neighbor graph from the embedding vectors.
+    if kmax >= num_points:
+        raise ValueError("Number of neighbors is larger than the number of data points")
 
-    :param emb: embedding vectors
+    nodes, neighbors, distances = find_nearest_neighbors(emb, emb, k = kmax, gpu_id)
+
+    retval = []
+    for _k in k:
+        c = neighbors[:, :_k].copy().reshape(-1)
+        r = nodes[:, :_k].copy().reshape(-1)
+        sim = distances[:, :_k].copy().reshape(-1)
+
+        if mutual:
+            r, c, sim = find_mutual_edges(r, c, sim)
+
+        A = sparse.csr_matrix((sim, (r, c)), shape=(num_points, num_points))
+
+        if binarize:
+            A.data = np.ones_like(A.data)
+        retval += [{"A": A, "k": _k}]
+    return retval
+
+def find_mutual_edges(r, c, v=None):
+    N = int(np.maximum(np.max(r), np.max(c)) + 1)
+    A = sparse.csr_matrix((np.ones_like(r), (r, c)), shape=(N, N))
+    A = A + A.T
+    A.data[A.data < 2] = 0
+    A.eliminate_zeros()
+    if v is None:
+        r, c, _ = sparse.find(sparse.triu(A, 1))
+        return r, c
+    elif v is not None:
+        br, bc, _ = sparse.find(sparse.triu(A, 1))
+        W = sparse.csr_matrix((v, (r, c)), shape=(N, N))
+        W = (W + W.T) / 2
+        bv = np.array(W[(br, bc)]).reshape(-1)
+        return br, bc, bv
+
+def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id = None):
+    """Find the nearest neighbors for each point.
+
+    :param emb: vectors for the points for which we find the nearest neighbors
+    :type emb: numpy.ndarray (num_entities, dim)
+    :param emb: vectors for the points from which we find the nearest neighbors.
     :type emb: numpy.ndarray (num_entities, dim)
     :param k: Number of nearest neighbors, defaults to 5
     :type k: int, optional
-    :param binarize: `binarize=False` will set the weight of the between nodes i and j  by exp(-d_{ij]}). `binarize=True` will set to one., defaults to True
     :paramm metric: Distance metric for finding nearest neighbors. Available metric `metric="euclidean"`, `metric="cosine"` , `metric="dotsim"`
     :type metric: str
-    :return: The adjacency matrix of the k-nearest neighbor graph
-    :rtype: sparse.csr_matrix
+    :return: IDs of emb (indices), and similarity (distances)
+    :rtype: indices (numpy.ndarray), distances (numpy.ndarray)
 
     .. highlight:: python
     .. code-block:: python
@@ -70,7 +93,8 @@ def _make_knn_graph(emb, k=5, binarize=True, metric="euclidean"):
         >>> import emlens
         >>> import numpy as np
         >>> emb = np.random.randn(100, 20)
-        >>> A = emlens.make_knn_graph(emb, k = 10)
+        >>> target = np.random.randn(10, 20)
+        >>> A = emlens.find_nearest_neighbors(target, emb, k = 10)
     """
     if emb.flags["C_CONTIGUOUS"]:
         emb = emb.copy(order="C")
@@ -90,35 +114,18 @@ def _make_knn_graph(emb, k=5, binarize=True, metric="euclidean"):
     else:
         raise NotImplementedError("does not support metric: {}".format(metric))
 
+    if gpu_id is not None:
+        res = faiss.StandardGpuResources()
+        index = faiss.index_cpu_to_gpu(res, gpu_id, index)
+
+
     index.add(emb.astype(np.float32))
-    distances, indices = index.search(emb.astype(np.float32), k=k)
-    r = np.outer(np.arange(indices.shape[0]), np.ones((1, k))).astype(int)
-    c = indices.astype(int).reshape(-1)
-    distances = distances.reshape(-1)
-    r = r.reshape(-1)
-    N = emb.shape[0]
-
-    s = (r >= 0) & (c >= 0)
-    r, c, distances = r[s], c[s], distances[s]
-
-    # Remove multi edges
-    # Construct K-NN graph
-    if binarize is True:
-        A = sparse.csr_matrix((np.ones_like(distances), (r, c)), shape=(N, N))
-    else:
-        # Sort the neighbors in descending order of edge weights
-        A = sparse.csr_matrix((np.exp(-distances), (r, c)), shape=(N, N))
-        for i in range(A.shape[0]):
-            w = A.data[A.indptr[i] : A.indptr[i + 1]]
-            nei = A.indices[A.indptr[i] : A.indptr[i + 1]]
-
-            order = np.argsort(A.data[A.indptr[i] : A.indptr[i + 1]])[::-1]
-            A.data[A.indptr[i] : A.indptr[i + 1]] = w[order].copy()
-            A.indices[A.indptr[i] : A.indptr[i + 1]] = nei[order].copy()
-    return A
+    neighbors, distances = index.search(emb.astype(np.float32), k=k)
+    nodes = (np.arange(emb.shape[0]).reshape((-1, 1)) @ np.ones((1, k))).astype(int)
+    return nodes, neighbors, distances
 
 
-def assortativity(emb, y, A=None, k=5, metric="euclidean"):
+def assortativity(emb, y, k=5, metric="euclidean", gpu_id):
     """Calculate the assortativity of `y` for close entities in the embedding
     space. A positive/negative assortativity indicates that the close entities
     tend to have a similar/dissimilar `y`. Zero assortativity means `y` is
@@ -130,8 +137,8 @@ def assortativity(emb, y, A=None, k=5, metric="euclidean"):
     :type y: numpy.ndarray (num_entities,)
     :param A: precomputed adjacency matrix of the graph. If None, a k-nearest neighbor graph will be constructed, defaults to None
     :type A: scipy.csr_matrix, optional
-    :param k: Number of the nearest neighbors, defaults to 5
-    :type k: int, optional
+    :param k: Number of the nearest neighbors. If a list is given, the assortativity for each k in the list will be calculated (in the same order of the list), defaults to 5
+    :type k: int or list, optional
     :paramm metric: Distance metric for finding nearest neighbors. Available metric `metric="euclidean"`, `metric="cosine"` , `metric="dotsim"`
     :type metric: str
     :return: assortativity
@@ -151,14 +158,22 @@ def assortativity(emb, y, A=None, k=5, metric="euclidean"):
         Then, the assortativity is calculated as the Pearson correlation of y between the adjacent nodes.
     """
 
-    if A is None:
-        A = make_knn_graph(emb, k=k, metric=metric)
-    r, c, v = sparse.find(A)
 
-    return stats.pearsonr(y[r], y[c])[0]
+    if isinstance(k, numbers.Number):
+        k = [k]
 
+    scores = []
+    for _k in k:
+        nodes, neighbors, _ = find_nearest_neighbors(emb, k=_k, metric = metric, gpu_id = gpu_id)
+        score = stats.pearsonr(y[nodes[:, :_k]].reshape(-1), y[neighbors[:, :_k]].reshape(-1))[0]
+        scores.append(score)
 
-def modularity(emb, group_ids, A=None, k=10, metric="euclidean"):
+    if len(scores) == 1:
+        return scores[0]
+
+    return scores
+
+def modularity(emb, group_ids, k=10, metric="euclidean", gpu_id = None):
     """Calculate the modularity of entities with group membership. The
     modularity ranges between [-1,1], where a positive modularity indicates
     that nodes with the same group membership tend to be close each other. Zero
@@ -187,23 +202,27 @@ def modularity(emb, group_ids, A=None, k=10, metric="euclidean"):
         >>> g = np.random.choice(10, 100)
         >>> rho = emlens.modularity(emb, g)
     """
+    if isinstance(k, numbers.Number):
+        k = [k]
 
-    if A is None:
-        A = make_knn_graph(emb, k=k, metric=metric)
-    r, c, v = sparse.find(A)
-
-    deg = np.array(A.sum(axis=0))
     labels, gids = np.unique(group_ids, return_inverse=True)
     U = sparse.csr_matrix(
         (np.ones_like(gids), (np.arange(gids.size), gids)),
         shape=(gids.size, len(labels)),
     )
-    D = np.array(deg.reshape(1, -1) @ U).reshape(-1)
-    Q = np.trace((U.T @ A @ U) - np.outer(D, D) / np.sum(D)) / np.sum(D)
-    return Q
+
+    Alist = make_knn_graph(emb, k=k, binarize=True, metric=metric, mutual = True, gpu_id = gpu_id)
+    scores = []
+    for row in Alist:
+        A = row["A"]
+        deg = np.array(A.sum(axis=0))
+        D = np.array(deg.reshape(1, -1) @ U).reshape(-1)
+        score = np.trace((U.T @ A @ U) - np.outer(D, D) / np.sum(D)) / np.sum(D)
+        scores.append(score)
+    return scores
 
 
-def nmi(emb, group_ids, A=None, k=10, metric="euclidean"):
+def nmi(emb, group_ids, A=None, k=10, metric="euclidean", gpu_id = None):
     """Calculate the Normalized Mutual Information for the entities with group
     membership. The NMI stands for the Normalized Mutual Information and takes
     a value between [0,1]. A larger NMI indicates that nodes with the same
@@ -237,8 +256,8 @@ def nmi(emb, group_ids, A=None, k=10, metric="euclidean"):
         >>> g = np.random.choice(10, 100)
         >>> rho = emlens.nmi(emb, g)
     """
-    if A is None:
-        A = make_knn_graph(emb, k=k, metric=metric)
+    if isinstance(k, numbers.Number):
+        k = [k]
 
     # Assign integers to group ids
     _, cids = np.unique(group_ids, return_inverse=True)
@@ -251,17 +270,23 @@ def nmi(emb, group_ids, A=None, k=10, metric="euclidean"):
     U = sparse.csr_matrix(
         (np.ones_like(cids), (np.arange(cids.size), cids)), shape=(N, K)
     )
-    prc = np.array((U.T @ A @ U).toarray())
-    prc = prc / np.sum(prc)
-    pr = np.array(np.sum(prc, axis=1)).reshape(-1)
-    pc = np.array(np.sum(prc, axis=0)).reshape(-1)
 
-    # Calculate the mutual information
-    Irc = stats.entropy(prc.reshape(-1), np.outer(pr, pc).reshape(-1))
+    Alist = make_knn_graph(emb, k=k, binarize=True, metric=metric, mutual = True, gpu_id = gpu_id)
+    scores = []
+    for row in Alist:
+        A = row["A"]
+        prc = np.array((U.T @ A @ U).toarray())
+        prc = prc / np.sum(prc)
+        pr = np.array(np.sum(prc, axis=1)).reshape(-1)
+        pc = np.array(np.sum(prc, axis=0)).reshape(-1)
 
-    # Normalize MI
-    Q = 2 * Irc / (stats.entropy(pr) + stats.entropy(pc))
-    return Q
+        # Calculate the mutual information
+        Irc = stats.entropy(prc.reshape(-1), np.outer(pr, pc).reshape(-1))
+
+        # Normalize MI
+        score = 2 * Irc / (stats.entropy(pr) + stats.entropy(pc))
+        scores.append(score)
+        return scores
 
 
 def element_sim(emb, group_ids, A=None, k=10, metric="euclidean"):
@@ -303,48 +328,60 @@ def element_sim(emb, group_ids, A=None, k=10, metric="euclidean"):
         >>> g = np.random.choice(10, 100)
         >>> rho = emlens.element_sim(emb, g)
     """
-    if A is None:
-        A = make_knn_graph(emb, k=k, metric=metric)
+    if isinstance(k, numbers.Number):
+        k = [k]
 
     # Assign integers to group ids
     _, cids = np.unique(group_ids, return_inverse=True)
 
     # Get size
     K = max(cids) + 1
+    N = cids.size
     M = len(A.data)
 
-    # Make a list of group memebrships
-    r, c, _ = sparse.find(A)
-    gA, gB = cids[r], cids[c]
-
-    # Calculate the element centric similarity
-    # A naive calculation is to compute individual p_ij and then sum them up to calculate S_i.
-    # However, this requires O(N^2) memory and computation time. To compute it efficiently, we
-    # rewrite \sum_{j} |p^A _{ij} - p^B _{ij}| in Eq. 5 of the original paper as
-    #   \sum_{j} |p^A _{ij} - p^B _{ij}| + \sum_{j} |p^A _{ij}| + \sum_{j} |p^B _{ij}|
-    #       + \sum_{g^A _i = g^A _j and g^B _i = g^B _j} ( |p^A _{ij} - p^B _{ij}| - |p^A _{ij}| - |p^B _{ij}|)
-    #   = 2 - \sum_{g^A _i = g^A _j and g^B _i = g^B _j} |p^A _{ij}| + |p^B _{ij}| -  |p^A _{ij} - p^B _{ij}|.
-    # where g^A _i is the membership of i in partition A.
-    # Denote by n^A _r the number of elements that belong to group r in partition A (and we analagously define n^B _c).
-    # In ddition, denote by n_{rc} the number of elements that belong to group r in partition A and group c in partition B.
-    # By substituting p_ij = alpha / n_A + (1-alpha) * (i == j), we have
-    #   S_i = 0.5 * n_{rc} * ( 1/n^A _{g^A _i} +  1/n^B _{g^B _i} - |1/n^A _{g^A _i} - 1/n^B _{g^B _i}|).
-    # Computing this for N nodes requires memory and computation time in order of O(NK), where K is the number of groups.
-    # This order can be substantially lower than O(N^2) if K<<N.
-    UA = sparse.csr_matrix((np.ones_like(gA), (np.arange(gA.size), gA)), shape=(M, K))
-    UB = sparse.csr_matrix((np.ones_like(gB), (np.arange(gB.size), gB)), shape=(M, K))
-
-    fA = np.array(UA.sum(axis=0)).reshape(-1)
-    fB = np.array(UB.sum(axis=0)).reshape(-1)
-    fAB = (UA.T @ UB).toarray()
-
-    Si = (
-        0.5
-        * fAB[(gA, gB)]
-        * (1.0 / fA[gA] + 1.0 / fB[gB] - np.abs(1.0 / fA[gA] - 1.0 / fB[gB]))
+    # Calculate the joint distribution
+    U = sparse.csr_matrix(
+        (np.ones_like(cids), (np.arange(cids.size), cids)), shape=(N, K)
     )
-    S = np.mean(Si)
-    return S
+
+    Alist = make_knn_graph(emb, k=k, binarize=True, metric=metric, mutual = True, gpu_id = gpu_id)
+    scores = []
+    for row in Alist:
+        A = row["A"]
+
+        # Make a list of group memebrships
+        r, c, _ = sparse.find(A)
+        gA, gB = cids[r], cids[c]
+
+        # Calculate the element centric similarity
+        # A naive calculation is to compute individual p_ij and then sum them up to calculate S_i.
+        # However, this requires O(N^2) memory and computation time. To compute it efficiently, we
+        # rewrite \sum_{j} |p^A _{ij} - p^B _{ij}| in Eq. 5 of the original paper as
+        #   \sum_{j} |p^A _{ij} - p^B _{ij}| + \sum_{j} |p^A _{ij}| + \sum_{j} |p^B _{ij}|
+        #       + \sum_{g^A _i = g^A _j and g^B _i = g^B _j} ( |p^A _{ij} - p^B _{ij}| - |p^A _{ij}| - |p^B _{ij}|)
+        #   = 2 - \sum_{g^A _i = g^A _j and g^B _i = g^B _j} |p^A _{ij}| + |p^B _{ij}| -  |p^A _{ij} - p^B _{ij}|.
+        # where g^A _i is the membership of i in partition A.
+        # Denote by n^A _r the number of elements that belong to group r in partition A (and we analagously define n^B _c).
+        # In ddition, denote by n_{rc} the number of elements that belong to group r in partition A and group c in partition B.
+        # By substituting p_ij = alpha / n_A + (1-alpha) * (i == j), we have
+        #   S_i = 0.5 * n_{rc} * ( 1/n^A _{g^A _i} +  1/n^B _{g^B _i} - |1/n^A _{g^A _i} - 1/n^B _{g^B _i}|).
+        # Computing this for N nodes requires memory and computation time in order of O(NK), where K is the number of groups.
+        # This order can be substantially lower than O(N^2) if K<<N.
+        UA = sparse.csr_matrix((np.ones_like(gA), (np.arange(gA.size), gA)), shape=(M, K))
+        UB = sparse.csr_matrix((np.ones_like(gB), (np.arange(gB.size), gB)), shape=(M, K))
+
+        fA = np.array(UA.sum(axis=0)).reshape(-1)
+        fB = np.array(UB.sum(axis=0)).reshape(-1)
+        fAB = (UA.T @ UB).toarray()
+
+        Si = (
+            0.5
+            * fAB[(gA, gB)]
+            * (1.0 / fA[gA] + 1.0 / fB[gB] - np.abs(1.0 / fA[gA] - 1.0 / fB[gB]))
+        )
+        score = np.mean(Si)
+        scores.append(score)
+    return score
 
 
 def f1_score(emb, target, agg="mode", **params):
@@ -671,7 +708,7 @@ def rog(emb, metric="euc", center=None):
     return rog
 
 
-def effective_dimension(emb, q=1, normalize=False, is_cov=False, return_dim_vec=False):
+def effective_dimension(emb, q=1, normalize=False, is_cov=False):
     """Effective dimensionality of a set of points in space.
 
     Effection dimensionality is the number of orthogonal dimensions needed to capture the overall correlational structure of data.
@@ -685,8 +722,6 @@ def effective_dimension(emb, q=1, normalize=False, is_cov=False, return_dim_vec=
     :type normalize: bool, optional
     :param is_cov: Set True if `emb` is the covariance matrix, defaults to False
     :type is_cov: bool, optional
-    :param return_dim_vec: Set True to get the vectors of the effective dimensions.
-    :type return_dim_vec: bool, optional
     :return: effective dimensionality
     :rtype: float
 
@@ -705,27 +740,58 @@ def effective_dimension(emb, q=1, normalize=False, is_cov=False, return_dim_vec=
         if normalize:
             emb = StandardScaler().fit_transform(emb)
         Cov = (emb.T @ emb) / emb.shape[0]
-    if return_dim_vec:
-        lam, v = linalg.eig(Cov)
-    else:
-        lam = linalg.eigvalsh(Cov)
+    lam = linalg.eigvalsh(Cov)
     lam = np.real(lam)
     lam = np.maximum(lam, 1e-10)
     p = lam / np.sum(lam)
     p = p[p > 0]
-
-    if return_dim_vec:
-        v = v[:, p > 0]
-        if q == 1:
-            return np.exp(stats.entropy(p)), v
-        elif np.isinf(q):
-            return -np.log(np.max(p)), v
-        else:
-            return np.log(np.sum(np.power(p, q))) / (1 - q), v
+    if q == 1:
+        return np.exp(stats.entropy(p))
+    elif np.isinf(q):
+        return -np.log(np.max(p))
     else:
-        if q == 1:
-            return np.exp(stats.entropy(p))
-        elif np.isinf(q):
-            return -np.log(np.max(p))
-        else:
-            return np.log(np.sum(np.power(p, q))) / (1 - q)
+        return np.log(np.sum(np.power(p, q))) / (1 - q)
+
+
+def effective_dimension_vector(emb, normalize=False, is_cov=False):
+    """Effective dimensionality of a set of points in space.
+
+    Effection dimensionality is the number of orthogonal dimensions needed to capture the overall correlational structure of data.
+    See Del Giudice, M. (2020). Effective Dimensionality: A Tutorial. _Multivariate Behavioral Research, 0(0), 1–16. https://doi.org/10.1080/00273171.2020.1743631.
+
+    :param emb: embedding vectors
+    :type emb: numpy.ndarray (num_entities, dim)
+    :param q: Parameter for the Renyi entropy function, defaults to 1
+    :type q: int, optional
+    :param normalize: Set True to center data. For spherical or quasi-spherical data (such as the embedding by word2vec), normalize=False is recommended, defaults to False
+    :type normalize: bool, optional
+    :param is_cov: Set True if `emb` is the covariance matrix, defaults to False
+    :type is_cov: bool, optional
+    :return: effective dimensionality
+    :rtype: float
+
+
+    .. highlight:: python
+    .. code-block:: python
+
+        >>> import emlens
+        >>> import numpy as np
+        >>> emb = np.random.randn(100, 20)
+        >>> ed = emlens.effective_dimension(emb)
+    """
+    if is_cov:
+        Cov = emb
+    else:
+        if normalize:
+            emb = StandardScaler().fit_transform(emb)
+        Cov = (emb.T @ emb) / emb.shape[0]
+    lam, v = linalg.eig(Cov)
+    order = np.argsort(lam)[::-1]
+    lam = lam[order]
+    v = v[:, order]
+
+    lam = np.real(lam)
+    lam = np.maximum(lam, 1e-10)
+    p = lam / np.sum(lam)
+    p = p[p > 0]
+    return v, p
