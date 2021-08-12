@@ -120,18 +120,18 @@ def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None):
     else:
         raise NotImplementedError("does not support metric: {}".format(metric))
 
-    if gpu_id is not None:
+    if gpu_id is None:
+        gpu_id = 0
+
+    try:
         res = faiss.StandardGpuResources()
         index = faiss.index_cpu_to_gpu(res, gpu_id, index)
-    else:
-        try:  # try using gpu version
-            res = faiss.StandardGpuResources()
-            index = faiss.index_cpu_to_gpu(res, 0, index)
-        except AttributeError:
-            pass
+        index.add(emb.astype(np.float32))
+        neighbors, distances = index.search(target.astype(np.float32), k=k)
+    except (AttributeError, AssertionError) as e:
+        index.add(emb.astype(np.float32))
+        neighbors, distances = index.search(target.astype(np.float32), k=k)
 
-    index.add(emb.astype(np.float32))
-    neighbors, distances = index.search(target.astype(np.float32), k=k)
     nodes = (np.arange(emb.shape[0]).reshape((-1, 1)) @ np.ones((1, k))).astype(int)
     neighbors = neighbors.astype(int)
     return nodes, neighbors, distances
@@ -507,113 +507,6 @@ def linear_pred_score(
         return score
 
 
-# def knn_pred_score(
-#    emb,
-#    target,
-#    scoring_func,
-#    metric="euclidean",
-#    agg="mode",
-#    A=None,
-#    k=10,
-#    n_splits=10,
-#    iteration=1,
-#    return_all_scores=False,
-# ):
-#    """Measuring the prediction performance based on the K-Nearest Neighbor
-#    Graph.
-#
-#    This function measures how well the embedding space can predict the metadata of entities using the K-nearest neighbor graph.
-#    To this end, the following K-folds cross validation is performed:
-#    0. Split all entities into K groups.
-#    1. Take one group as a test set and the other groups as a training set
-#    2. Using the training set, predict the `target` variable for the entities in the training set.
-#    3. Calculate the prediction accuracy
-#    4. Repeat Steps 1-3 such that each group is used as the test set once.
-#    5. Compute the average of the prediction accuracy computed in Step 3.
-#
-#    The performance score is measured based on the micro f1-score for the discrete target variable or R^2 for the continuous target variable.
-#    Other scoring measures can be used by passing the score function as `scoring_func argument`.
-#
-#    :param emb: embedding vectors
-#    :type emb: numpy.ndarray (num_entities, dim)
-#    :param target: target variable to predict
-#    :type target: numpy.ndarray (num_target,)
-#    :param scoring_func: scoring function. This function will take a target variable `y` as the first argumebt and predicted variable `ypred` as the second argumebt, and ouputs the prediction score `score`, i.e., score=scoring_func(y, ypred).
-#    :type scoring_func: numpy func
-#    :paramm metric: Distance metric for finding nearest neighbors. Available metric `metric="euclidean"`, `metric="cosine"` , `metric="dotsim"`
-#    :type metric: str
-#    :paramm agg: How to aggregate the neighbors' variables. Setting `aggregation='mode'` uses the most frequent label, `='mean'` uses the mean as the predicted variable.
-#                 If there are more than k neighbors, aggregate the k neighbors connected by the edges with the largest weights, defaults to 'mode'
-#    :type agg: str
-#    :param A: precomputed adjacency matrix of the graph. If None, a k-nearest neighbor graph will be constructed, defaults to None
-#    :type A: scipy.csr_matrix, optional
-#    :param k: Number of nearest neighbors, defaults to 10
-#    :type k: int, optional
-#    :param n_splits: Number of folds, defaults to 10
-#    :type n_splits: int, optional
-#    :param iteration: Number of rounds of the cross validation. If iteration>1, the average of the cross validation score will be returned., defaults to 1.
-#    :type iteration: int
-#    :param return_all_scores: "return_all_scores=True" or "=False" to return all scores in the cross validations or not, respectively.
-#    :type  return_all_scores: bool
-#    :return: performance score
-#    :rtype: float
-#    """
-#
-#    if A is None:
-#        A = make_knn_graph(emb, k=k, metric=metric)
-#
-#    scores = []
-#    all_score = []
-#    for _i in range(iteration):
-#        kf = KFold(n_splits=n_splits)
-#        _scores = []
-#        for train_index, test_index in kf.split(target):
-#            y_train = target[train_index]
-#            y_test = target[test_index]
-#
-#            # Train
-#            B = sparse.csr_matrix(A[test_index, :][:, train_index])
-#
-#            # Evaluation
-#            y_pred = -np.zeros(len(test_index)) * np.nan
-#            for i in range(B.shape[0]):
-#
-#                # pick neighbors and edge weights
-#                nei = B.indices[B.indptr[i] : B.indptr[i + 1]]
-#
-#                if len(nei) == 0:  # no neighbors, then skip
-#                    continue
-#
-#                neighbors_variables = y_train[nei]
-#
-#                if (
-#                    len(nei) > k
-#                ):  # if more than k neighbors, then pick the k neighbors connected by large edge weights
-#                    w = B.data[B.indptr[i] : B.indptr[i + 1]]
-#                    ind = np.argsort(-w)[:k]
-#                    neighbors_variables = neighbors_variables[ind]
-#
-#                if agg == "mode":
-#                    y_pred[i] = stats.mode(neighbors_variables)[0]
-#                elif agg == "mean":
-#                    y_pred[i] = np.mean(neighbors_variables)
-#            nonnan = ~np.isnan(y_pred)
-#            y_test, y_pred = y_test[nonnan], y_pred[nonnan]
-#            _score = scoring_func(y_test, y_pred)
-#
-#            if np.isnan(_score):
-#                continue
-#            _scores += [_score]
-#            all_score += [_score]
-#
-#        scores += [np.mean(_scores)]
-#    score = np.mean(scores)
-#    if return_all_scores:
-#        return all_score
-#    else:
-#        return score
-
-
 def knn_pred_score(
     emb,
     target,
@@ -624,9 +517,31 @@ def knn_pred_score(
     n_splits=10,
     iteration=1,
     return_all_scores=False,
-    gpu_id=None
-    # def eval_pred_by_knn(emb, fname, metric, klist, n_splits, gpu_id = 0):
+    gpu_id=None,
 ):
+    """Prediction based on k-Nearest neighbor graph.
+
+    :param emb: embedding vectors
+    :type emb: numpy.ndarray (num_entities, dim)
+    :param target: target variable to predict
+    :type target: numpy.ndarray (num_target,)
+    :param scoring_func: scoring function. This function will take a target variable `y` as the first argumebt and predicted variable `ypred` as the second argumebt, and ouputs the prediction score `score`, i.e., score=scoring_func(y, ypred).
+    :type scoring_func: numpy func
+    :paramm metric: Distance metric for finding nearest neighbors. Available metric `metric="euclidean"`, `metric="cosine"` , `metric="dotsim"`
+    :type metric: str
+    :paramm agg: How to aggregate the neighbors' variables. Setting `aggregation='mode'` uses the most frequent label, `='mean'` uses the mean as the predicted variable.
+                 If there are more than k neighbors, aggregate the k neighbors connected by the edges with the largest weights, defaults to 'mode'
+    :type agg: str
+    :param k: Number of nearest neighbors, defaults to 10
+    :type k: int or list, optional
+    :param n_splits: Number of folds, defaults to 10
+    :type n_splits: int, optional
+    :param iteration: Number of rounds of the cross validation. If iteration>1, the average of the cross validation score will be returned., defaults to 1.
+    :type iteration: int
+    :return: dict object {"k", "score"}, where k is the number of neighbors, and score is the prediction score.
+    :rtype: dict
+    """
+
     kf = KFold(n_splits=n_splits, shuffle=True)
     scores = []
     for _, (train_index, test_index) in enumerate(kf.split(target)):

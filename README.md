@@ -13,7 +13,23 @@ https://emlens.readthedocs.io/en/latest/
 
 ## Install
 
+### Prerequisite
+
+*conda*:
+```bash
+conda install -c conda-forge faiss-gpu
 ```
+
+Or *pip*:
+```
+pip install faiss-gpu
+```
+
+*If faiss-gpu cannot be installed, use faiss-cpu instead.*
+
+### Installing emlens
+
+```bash
 pip install emlens
 ```
 
