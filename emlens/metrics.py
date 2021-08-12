@@ -123,6 +123,12 @@ def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None):
     if gpu_id is not None:
         res = faiss.StandardGpuResources()
         index = faiss.index_cpu_to_gpu(res, gpu_id, index)
+    else:
+        try:  # try using gpu version
+            res = faiss.StandardGpuResources()
+            index = faiss.index_cpu_to_gpu(res, 0, index)
+        except AttributeError:
+            pass
 
     index.add(emb.astype(np.float32))
     neighbors, distances = index.search(target.astype(np.float32), k=k)
