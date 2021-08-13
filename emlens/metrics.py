@@ -128,7 +128,8 @@ def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None):
         index = faiss.index_cpu_to_gpu(res, gpu_id, index)
         index.add(emb.astype(np.float32))
         neighbors, distances = index.search(target.astype(np.float32), k=k)
-    except (AttributeError, AssertionError) as e:
+    except:
+        # except (AttributeError, AssertionError) as e:
         index.add(emb.astype(np.float32))
         neighbors, distances = index.search(target.astype(np.float32), k=k)
 
