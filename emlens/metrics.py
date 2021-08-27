@@ -134,17 +134,16 @@ def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None):
         distances, neighbors = index.search(target.astype(np.float32), k=k)
     else:
         try:
-            gpu_id = int(device[-1])
             res = faiss.StandardGpuResources()
             index = faiss.index_cpu_to_gpu(res, gpu_id, index)
             index.add(emb.astype(np.float32))
-            distances, indices = index.search(
-                target.astype(np.float32), k=num_neighbors
+            distances, neighbors = index.search(
+                target.astype(np.float32), k=k
             )
         except RuntimeError:
             index.add(emb.astype(np.float32))
-            distances, indices = index.search(
-                target.astype(np.float32), k=num_neighbors
+            distances, neighbors = index.search(
+                target.astype(np.float32), k=k
             )
     #        try:
     #            res = faiss.StandardGpuResources()
