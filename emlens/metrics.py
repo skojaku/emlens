@@ -8,6 +8,7 @@ from sklearn import metrics as skmetrics
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
+from tqdm import tqdm
 
 
 def make_knn_graph(
@@ -104,6 +105,8 @@ def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None):
     """
     if emb.flags["C_CONTIGUOUS"]:
         emb = emb.copy(order="C")
+    if target.flags["C_CONTIGUOUS"]:
+        target = target.copy(order="C")
 
     # Find the nearest neighbors
     if metric == "euclidean":
@@ -113,8 +116,11 @@ def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None):
         denom[np.isclose(denom, 0)] = 1
         emb = np.einsum("i,ij->ij", 1 / denom, emb)
 
+        denom = np.array(np.linalg.norm(target, axis=1)).reshape(-1)
+        denom[np.isclose(denom, 0)] = 1
+        target = np.einsum("i,ij->ij", 1 / denom, target)
         # emb = sparse.diags(1 / ) @ emb
-        index = faiss.IndexFlatL2(emb.shape[1])
+        index = faiss.IndexFlatIP(emb.shape[1])
     elif metric == "dotsim":
         index = faiss.IndexFlatIP(emb.shape[1])
     else:
@@ -123,17 +129,22 @@ def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None):
     if gpu_id is None:
         gpu_id = 0
 
-    try:
-        res = faiss.StandardGpuResources()
-        index = faiss.index_cpu_to_gpu(res, gpu_id, index)
+    if k >= 2048:  # if k is larger than that supported by GPU
         index.add(emb.astype(np.float32))
-        neighbors, distances = index.search(target.astype(np.float32), k=k)
-    except:
-        # except (AttributeError, AssertionError) as e:
-        index.add(emb.astype(np.float32))
-        neighbors, distances = index.search(target.astype(np.float32), k=k)
+        distances, neighbors = index.search(target.astype(np.float32), k=k)
+    else:
+        try:
+            res = faiss.StandardGpuResources()
+            index = faiss.index_cpu_to_gpu(res, gpu_id, index)
+            index.add(emb.astype(np.float32))
+            distances, neighbors = index.search(target.astype(np.float32), k=k)
+        except:
+            # except (AttributeError, AssertionError) as e:
+            index.add(emb.astype(np.float32))
+            neighbors, distances = index.search(target.astype(np.float32), k=k)
+            print("cpu")
 
-    nodes = (np.arange(emb.shape[0]).reshape((-1, 1)) @ np.ones((1, k))).astype(int)
+    nodes = (np.arange(target.shape[0]).reshape((-1, 1)) @ np.ones((1, k))).astype(int)
     neighbors = neighbors.astype(int)
     return nodes, neighbors, distances
 
@@ -545,26 +556,28 @@ def knn_pred_score(
 
     kf = KFold(n_splits=n_splits, shuffle=True)
     scores = []
-    for _, (train_index, test_index) in enumerate(kf.split(target)):
+    pbar = tqdm(total=iteration * n_splits)
+    for it in range(iteration):
+        for _, (train_index, test_index) in enumerate(kf.split(target)):
+            train_emb = emb[train_index, :]
+            test_emb = emb[test_index, :]
+            train_labels = target[train_index]
+            test_labels = target[test_index]
 
-        train_emb = emb[train_index, :]
-        test_emb = emb[test_index, :]
-        train_labels = target[train_index]
-        test_labels = target[test_index]
+            pred_k = make_knn_pred(
+                test_emb,
+                train_emb,
+                train_labels=train_labels,
+                klist=k,
+                agg=agg,
+                metric=metric,
+                gpu_id=gpu_id,
+            )
 
-        pred_k = make_knn_pred(
-            test_emb,
-            train_emb,
-            train_labels=train_labels,
-            klist=k,
-            agg=agg,
-            metric=metric,
-            gpu_id=gpu_id,
-        )
-
-        for k, pred in pred_k.items():
-            score = scoring_func(test_labels, pred)
-            scores.append({"score": score, "k": k})
+            for _k, pred in pred_k.items():
+                score = scoring_func(test_labels, pred)
+                scores.append({"score": score, "k": _k})
+            pbar.update(1)
     return scores
 
 
