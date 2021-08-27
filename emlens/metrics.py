@@ -137,14 +137,10 @@ def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None):
             res = faiss.StandardGpuResources()
             index = faiss.index_cpu_to_gpu(res, gpu_id, index)
             index.add(emb.astype(np.float32))
-            distances, neighbors = index.search(
-                target.astype(np.float32), k=k
-            )
+            distances, neighbors = index.search(target.astype(np.float32), k=k)
         except RuntimeError:
             index.add(emb.astype(np.float32))
-            distances, neighbors = index.search(
-                target.astype(np.float32), k=k
-            )
+            distances, neighbors = index.search(target.astype(np.float32), k=k)
     #        try:
     #            res = faiss.StandardGpuResources()
     #            index = faiss.index_cpu_to_gpu(res, gpu_id, index)
@@ -568,7 +564,7 @@ def knn_pred_score(
     kf = KFold(n_splits=n_splits, shuffle=True)
     scores = []
     pbar = tqdm(total=iteration * n_splits)
-    for it in range(iteration):
+    for _ in range(iteration):
         for _, (train_index, test_index) in enumerate(kf.split(target)):
             train_emb = emb[train_index, :]
             test_emb = emb[test_index, :]
