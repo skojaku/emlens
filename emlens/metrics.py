@@ -142,7 +142,6 @@ def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None):
             # except (AttributeError, AssertionError) as e:
             index.add(emb.astype(np.float32))
             neighbors, distances = index.search(target.astype(np.float32), k=k)
-            print("cpu")
 
     nodes = (np.arange(target.shape[0]).reshape((-1, 1)) @ np.ones((1, k))).astype(int)
     neighbors = neighbors.astype(int)
