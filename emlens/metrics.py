@@ -134,14 +134,27 @@ def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None):
         distances, neighbors = index.search(target.astype(np.float32), k=k)
     else:
         try:
+            gpu_id = int(device[-1])
             res = faiss.StandardGpuResources()
             index = faiss.index_cpu_to_gpu(res, gpu_id, index)
             index.add(emb.astype(np.float32))
-            distances, neighbors = index.search(target.astype(np.float32), k=k)
-        except:
-            # except (AttributeError, AssertionError) as e:
+            distances, indices = index.search(
+                target.astype(np.float32), k=num_neighbors
+            )
+        except RuntimeError:
             index.add(emb.astype(np.float32))
-            neighbors, distances = index.search(target.astype(np.float32), k=k)
+            distances, indices = index.search(
+                target.astype(np.float32), k=num_neighbors
+            )
+    #        try:
+    #            res = faiss.StandardGpuResources()
+    #            index = faiss.index_cpu_to_gpu(res, gpu_id, index)
+    #            index.add(emb.astype(np.float32))
+    #            distances, neighbors = index.search(target.astype(np.float32), k=k)
+    #        except:
+    #            # except (AttributeError, AssertionError) as e:
+    #            index.add(emb.astype(np.float32))
+    #            neighbors, distances = index.search(target.astype(np.float32), k=k)
 
     nodes = (np.arange(target.shape[0]).reshape((-1, 1)) @ np.ones((1, k))).astype(int)
     neighbors = neighbors.astype(int)
