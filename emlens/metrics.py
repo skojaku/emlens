@@ -501,7 +501,7 @@ def linear_pred_score(
     scores = []
     all_score = []
     for _i in range(iteration):
-        kf = KFold(n_splits=n_splits)
+        kf = KFold(n_splits=n_splits, shuffle=True)
         _scores = []
         for train_index, test_index in kf.split(target):
             x_train = emb[train_index, :]
@@ -561,10 +561,10 @@ def knn_pred_score(
     :rtype: dict
     """
 
-    kf = KFold(n_splits=n_splits, shuffle=True)
     scores = []
     pbar = tqdm(total=iteration * n_splits)
     for _ in range(iteration):
+        kf = KFold(n_splits=n_splits, shuffle=True)
         for _, (train_index, test_index) in enumerate(kf.split(target)):
             train_emb = emb[train_index, :]
             test_emb = emb[test_index, :]
