@@ -80,7 +80,7 @@ def find_mutual_edges(r, c, v=None):
         return br, bc, bv
 
 
-def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None):
+def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None, exact=True):
     """Find the nearest neighbors for each point.
 
     :param emb: vectors for the points for which we find the nearest neighbors
@@ -107,10 +107,17 @@ def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None):
         emb = emb.copy(order="C")
     if target.flags["C_CONTIGUOUS"]:
         target = target.copy(order="C")
-
+    emb = emb.astype(np.float32)
+    target = target.astype(np.float32)
     # Find the nearest neighbors
     if metric == "euclidean":
-        index = faiss.IndexFlatL2(emb.shape[1])
+        if exact:
+            index = faiss.IndexFlatL2(emb.shape[1])
+        else:
+            quantiser = faiss.IndexFlatL2(emb.shape[1])
+            nlist = int(np.ceil(10 * np.sqrt(emb.shape[0])))
+            index = faiss.IndexIVFFlat(quantiser, emb.shape[1], nlist, faiss.METRIC_L2)
+            index.train(emb)
     elif metric == "cosine":
         denom = np.array(np.linalg.norm(emb, axis=1)).reshape(-1)
         denom[np.isclose(denom, 0)] = 1
@@ -119,10 +126,22 @@ def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None):
         denom = np.array(np.linalg.norm(target, axis=1)).reshape(-1)
         denom[np.isclose(denom, 0)] = 1
         target = np.einsum("i,ij->ij", 1 / denom, target)
-        # emb = sparse.diags(1 / ) @ emb
-        index = faiss.IndexFlatIP(emb.shape[1])
+        
+        if exact:
+            index = faiss.IndexFlatIP(emb.shape[1])
+        else:
+            quantiser = faiss.IndexFlatIP(emb.shape[1])
+            nlist = int(np.ceil(10 * np.sqrt(emb.shape[0])))
+            index = faiss.IndexIVFFlat(quantiser, emb.shape[1], nlist, faiss.METRIC_INNER_PRODUCT)
+            index.train(emb)
     elif metric == "dotsim":
-        index = faiss.IndexFlatIP(emb.shape[1])
+        if exact:
+            index = faiss.IndexFlatIP(emb.shape[1])
+        else:
+            quantiser = faiss.IndexFlatIP(emb.shape[1])
+            nlist = int(np.ceil(10 * np.sqrt(emb.shape[0])))
+            index = faiss.IndexIVFFlat(quantiser, emb.shape[1], nlist, faiss.METRIC_INNER_PRODUCT)
+            index.train(emb)
     else:
         raise NotImplementedError("does not support metric: {}".format(metric))
 
@@ -130,17 +149,17 @@ def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None):
         gpu_id = 0
 
     if k >= 2048:  # if k is larger than that supported by GPU
-        index.add(emb.astype(np.float32))
-        distances, neighbors = index.search(target.astype(np.float32), k=k)
+        index.add(emb)
+        distances, neighbors = index.search(target, k=k)
     else:
         try:
             res = faiss.StandardGpuResources()
             index = faiss.index_cpu_to_gpu(res, gpu_id, index)
-            index.add(emb.astype(np.float32))
-            distances, neighbors = index.search(target.astype(np.float32), k=k)
+            index.add(emb)
+            distances, neighbors = index.search(target, k=k)
         except RuntimeError:
             index.add(emb.astype(np.float32))
-            distances, neighbors = index.search(target.astype(np.float32), k=k)
+            distances, neighbors = index.search(target, k=k)
     #        try:
     #            res = faiss.StandardGpuResources()
     #            index = faiss.index_cpu_to_gpu(res, gpu_id, index)
@@ -537,6 +556,7 @@ def knn_pred_score(
     iteration=1,
     return_all_scores=False,
     gpu_id=None,
+    knn_exact=True
 ):
     """Prediction based on k-Nearest neighbor graph.
 
@@ -579,6 +599,7 @@ def knn_pred_score(
                 agg=agg,
                 metric=metric,
                 gpu_id=gpu_id,
+                knn_exact=knn_exact
             )
 
             for _k, pred in pred_k.items():
@@ -589,7 +610,7 @@ def knn_pred_score(
 
 
 def make_knn_pred(
-    target, emb, train_labels, klist, agg="mode", metric="euclidean", gpu_id=None
+    target, emb, train_labels, klist, agg="mode", metric="euclidean", gpu_id=None, knn_exact=True
 ):
 
     if isinstance(klist, numbers.Number):
@@ -598,7 +619,7 @@ def make_knn_pred(
     # Train
     kmax = int(np.max(klist))
     _, indices, distances = find_nearest_neighbors(
-        target, emb, k=kmax, metric=metric, gpu_id=gpu_id
+        target, emb, k=kmax, metric=metric, gpu_id=gpu_id, exact=knn_exact
     )
 
     # Agrgegation

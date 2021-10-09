@@ -1,4 +1,4 @@
-faiss-gpu
+faiss-cpu
 tqdm
 numba
 numpy
