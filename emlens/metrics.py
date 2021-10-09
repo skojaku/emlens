@@ -452,9 +452,31 @@ def element_sim(emb, group_ids, A=None, k=10, metric="euclidean", gpu_id=None):
 
 def f1_score(emb, target, agg="mode", **params):
     """Measuring the prediction performance based on the K-Nearest Neighbor
-    Graph.
+    Graph. Equivalent to knn_pred_score(emb, target, target_type = "disc").
 
-    Equivalent to knn_pred_score(emb, target, target_type = "disc").
+
+    :param emb: embedding vectors
+    :type emb: numpy.ndarray (num_entities, dim)
+    :param target: target variable to predict
+    :type target: numpy.ndarray (num_target,)
+    :paramm metric: Distance metric for finding nearest neighbors. Available metric `metric="euclidean"`, `metric="cosine"` , `metric="dotsim"`
+    :type metric: str
+    :paramm agg: How to aggregate the neighbors' variables. Setting `aggregation='mode'` uses the most frequent label, `='mean'` uses the mean as the predicted variable.
+    :type agg: str
+    :param k: Number of nearest neighbors, defaults to 10
+    :type k: int or list, optional
+    :param n_splits: Number of folds for the cross-validation, defaults to 10
+    :type n_splits: int, optional
+    :param iteration: Number of rounds of the cross validation. If iteration>1, the average of the cross validation score will be returned. If `return_score_all=True`, all scores will be returned, defaults to 1.
+    :type iteration: int
+    :param return_all_scores: Set `True` to return all scores for the cross-vaidations. If set `False`, the mean of the score is returned
+    :type return_all_scores: bool
+    :param gpu_id: ID of the GPU device.
+    :type gpu_id: string or int
+    :param knn_exact: Set `True` to use the exact nearest neighbors for prediction. If set `False`, hueristics are used to find "probably" the nearest neighbors for the sake of substantial computation speed up.
+    :type knn_exact: string or int
+    :return: dict object {"k", "score"}, where k is the number of neighbors, and score is the prediction score.
+    :rtype: dict
     """
     scoring_func = partial(skmetrics.f1_score, average="micro")
     _, _target = np.unique(target, return_inverse=True)
@@ -575,6 +597,12 @@ def knn_pred_score(
     :type n_splits: int, optional
     :param iteration: Number of rounds of the cross validation. If iteration>1, the average of the cross validation score will be returned., defaults to 1.
     :type iteration: int
+    :param return_all_scores: Set `True` to return all scores for the cross-vaidations. If set `False`, the mean of the score is returned
+    :type return_all_scores: bool
+    :param gpu_id: ID of the GPU device.
+    :type gpu_id: string or int
+    :param knn_exact: Set `True` to use the exact nearest neighbors for prediction. If set `False`, hueristics are used to find "probably" the nearest neighbors for the sake of substantial computation speed up.
+    :type knn_exact: string or int
     :return: dict object {"k", "score"}, where k is the number of neighbors, and score is the prediction score.
     :rtype: dict
     """
@@ -589,7 +617,7 @@ def knn_pred_score(
             train_labels = target[train_index]
             test_labels = target[test_index]
 
-            pred_k = make_knn_pred(
+            pred_k = _make_knn_pred(
                 test_emb,
                 train_emb,
                 train_labels=train_labels,
@@ -607,7 +635,7 @@ def knn_pred_score(
     return scores
 
 
-def make_knn_pred(
+def _make_knn_pred(
     target,
     emb,
     train_labels,
@@ -617,6 +645,7 @@ def make_knn_pred(
     gpu_id=None,
     knn_exact=True,
 ):
+    """Inner function for make_knn_pred_score."""
 
     if isinstance(klist, numbers.Number):
         klist = [klist]
