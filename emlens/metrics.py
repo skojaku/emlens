@@ -156,25 +156,17 @@ def find_nearest_neighbors(
 
     if k >= 2048:  # if k is larger than that supported by GPU
         index.add(emb)
-        distances, neighbors = index.search(target, k=k)
     else:
         try:
             res = faiss.StandardGpuResources()
             index = faiss.index_cpu_to_gpu(res, gpu_id, index)
             index.add(emb)
-            distances, neighbors = index.search(target, k=k)
-        except RuntimeError:
-            index.add(emb.astype(np.float32))
-            distances, neighbors = index.search(target, k=k)
-    #        try:
-    #            res = faiss.StandardGpuResources()
-    #            index = faiss.index_cpu_to_gpu(res, gpu_id, index)
-    #            index.add(emb.astype(np.float32))
-    #            distances, neighbors = index.search(target.astype(np.float32), k=k)
-    #        except:
-    #            # except (AttributeError, AssertionError) as e:
-    #            index.add(emb.astype(np.float32))
-    #            neighbors, distances = index.search(target.astype(np.float32), k=k)
+        except (RuntimeError, AttributeError):
+            index.add(emb)
+    distances, neighbors = index.search(target, k=k)
+
+    assert distances.dtype == "float32"
+    assert neighbors.dtype == "int64"
 
     nodes = (np.arange(target.shape[0]).reshape((-1, 1)) @ np.ones((1, k))).astype(int)
     neighbors = neighbors.astype(int)
