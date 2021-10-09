@@ -13,25 +13,26 @@ https://emlens.readthedocs.io/en/latest/
 
 ## Install
 
-### Prerequisite
+```bash
+pip install emlens
+```
 
-*conda*:
+`emlens` uses [faiss library](https://github.com/facebookresearch/faiss), which has two versions, `faiss-cpu` and `faiss-gpu`.
+As the name stands, `faiss-gpu` can leverage GPUs, thureby faster if you have GPUs. `emlens` uses `faiss-cpu` by default to avoid unnecessary GPU-related troubles.
+Yet, you can still leverage the GPUs (which is recommended if you have) by installing `faiss-gpu` by
+
+*with conda*:
 ```bash
 conda install -c conda-forge faiss-gpu
 ```
 
-Or *pip*:
+or *with pip*:
 ```
 pip install faiss-gpu
 ```
 
-*If faiss-gpu cannot be installed, use faiss-cpu instead.*
-
 ### Installing emlens
 
-```bash
-pip install emlens
-```
 
 ## Maintenance
 
