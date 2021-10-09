@@ -80,7 +80,9 @@ def find_mutual_edges(r, c, v=None):
         return br, bc, bv
 
 
-def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None, exact=True):
+def find_nearest_neighbors(
+    target, emb, k=5, metric="euclidean", gpu_id=None, exact=True
+):
     """Find the nearest neighbors for each point.
 
     :param emb: vectors for the points for which we find the nearest neighbors
@@ -126,13 +128,15 @@ def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None, ex
         denom = np.array(np.linalg.norm(target, axis=1)).reshape(-1)
         denom[np.isclose(denom, 0)] = 1
         target = np.einsum("i,ij->ij", 1 / denom, target)
-        
+
         if exact:
             index = faiss.IndexFlatIP(emb.shape[1])
         else:
             quantiser = faiss.IndexFlatIP(emb.shape[1])
             nlist = int(np.ceil(10 * np.sqrt(emb.shape[0])))
-            index = faiss.IndexIVFFlat(quantiser, emb.shape[1], nlist, faiss.METRIC_INNER_PRODUCT)
+            index = faiss.IndexIVFFlat(
+                quantiser, emb.shape[1], nlist, faiss.METRIC_INNER_PRODUCT
+            )
             index.train(emb)
     elif metric == "dotsim":
         if exact:
@@ -140,7 +144,9 @@ def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None, ex
         else:
             quantiser = faiss.IndexFlatIP(emb.shape[1])
             nlist = int(np.ceil(10 * np.sqrt(emb.shape[0])))
-            index = faiss.IndexIVFFlat(quantiser, emb.shape[1], nlist, faiss.METRIC_INNER_PRODUCT)
+            index = faiss.IndexIVFFlat(
+                quantiser, emb.shape[1], nlist, faiss.METRIC_INNER_PRODUCT
+            )
             index.train(emb)
     else:
         raise NotImplementedError("does not support metric: {}".format(metric))
@@ -556,7 +562,7 @@ def knn_pred_score(
     iteration=1,
     return_all_scores=False,
     gpu_id=None,
-    knn_exact=True
+    knn_exact=True,
 ):
     """Prediction based on k-Nearest neighbor graph.
 
@@ -599,7 +605,7 @@ def knn_pred_score(
                 agg=agg,
                 metric=metric,
                 gpu_id=gpu_id,
-                knn_exact=knn_exact
+                knn_exact=knn_exact,
             )
 
             for _k, pred in pred_k.items():
@@ -610,7 +616,14 @@ def knn_pred_score(
 
 
 def make_knn_pred(
-    target, emb, train_labels, klist, agg="mode", metric="euclidean", gpu_id=None, knn_exact=True
+    target,
+    emb,
+    train_labels,
+    klist,
+    agg="mode",
+    metric="euclidean",
+    gpu_id=None,
+    knn_exact=True,
 ):
 
     if isinstance(klist, numbers.Number):
