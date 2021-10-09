@@ -458,7 +458,7 @@ def f1_score(emb, target, agg="mode", **params):
     To this end, the following K-folds cross-validation is performed:
     0. Split all entities into K groups.
     1. Take one group as a test set and the other groups as a training set
-    2. Using the training set, predict the `target` variable for the entities in the training set. The prediction is made by the most frequent target variables of the nearest neighbors. 
+    2. Using the training set, predict the `target` variable for the entities in the training set. The prediction is made by the most frequent target variables of the nearest neighbors.
     3. Calculate the prediction accuracy by the f1-score
     4. Repeat Steps 1-3 such that each group is used as the test set once.
     5. Compute the average of the prediction accuracy computed in Step 3.
@@ -497,13 +497,13 @@ def r2_score(emb, target, model="linear", test=True, **params):
     Graph or Linear Regression.
 
     If model == "knn", this is quivalent to knn_pred_score(emb, target, target_type = "cont").
-    
+
     This function measures how well the embedding space can predict the metadata of entities using the k-nearest neighbor algorithm.
     To this end, the following K-folds cross-validation is performed:
     0. Split all entities into K groups.
     1. Take one group as a test set and the other groups as a training set
     2. Using the training set, predict the `target` variable for the entities in the training set. The prediction is made by the average target variables of the nearest neighbors.
-    3. Calculate the prediction accuracy by the R^2 score 
+    3. Calculate the prediction accuracy by the R^2 score
     4. Repeat Steps 1-3 such that each group is used as the test set once.
     5. Compute the average of the prediction accuracy computed in Step 3.
 
