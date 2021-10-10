@@ -8,6 +8,7 @@ from sklearn import metrics as skmetrics
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
+from tqdm import tqdm
 
 
 def make_knn_graph(
@@ -79,7 +80,9 @@ def find_mutual_edges(r, c, v=None):
         return br, bc, bv
 
 
-def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None):
+def find_nearest_neighbors(
+    target, emb, k=5, metric="euclidean", gpu_id=None, exact=True
+):
     """Find the nearest neighbors for each point.
 
     :param emb: vectors for the points for which we find the nearest neighbors
@@ -104,35 +107,68 @@ def find_nearest_neighbors(target, emb, k=5, metric="euclidean", gpu_id=None):
     """
     if emb.flags["C_CONTIGUOUS"]:
         emb = emb.copy(order="C")
-
+    if target.flags["C_CONTIGUOUS"]:
+        target = target.copy(order="C")
+    emb = emb.astype(np.float32)
+    target = target.astype(np.float32)
     # Find the nearest neighbors
     if metric == "euclidean":
-        index = faiss.IndexFlatL2(emb.shape[1])
+        if exact:
+            index = faiss.IndexFlatL2(emb.shape[1])
+        else:
+            quantiser = faiss.IndexFlatL2(emb.shape[1])
+            nlist = int(np.ceil(10 * np.sqrt(emb.shape[0])))
+            index = faiss.IndexIVFFlat(quantiser, emb.shape[1], nlist, faiss.METRIC_L2)
+            index.train(emb)
     elif metric == "cosine":
         denom = np.array(np.linalg.norm(emb, axis=1)).reshape(-1)
         denom[np.isclose(denom, 0)] = 1
         emb = np.einsum("i,ij->ij", 1 / denom, emb)
 
-        # emb = sparse.diags(1 / ) @ emb
-        index = faiss.IndexFlatL2(emb.shape[1])
+        denom = np.array(np.linalg.norm(target, axis=1)).reshape(-1)
+        denom[np.isclose(denom, 0)] = 1
+        target = np.einsum("i,ij->ij", 1 / denom, target)
+
+        if exact:
+            index = faiss.IndexFlatIP(emb.shape[1])
+        else:
+            quantiser = faiss.IndexFlatIP(emb.shape[1])
+            nlist = int(np.ceil(10 * np.sqrt(emb.shape[0])))
+            index = faiss.IndexIVFFlat(
+                quantiser, emb.shape[1], nlist, faiss.METRIC_INNER_PRODUCT
+            )
+            index.train(emb)
     elif metric == "dotsim":
-        index = faiss.IndexFlatIP(emb.shape[1])
+        if exact:
+            index = faiss.IndexFlatIP(emb.shape[1])
+        else:
+            quantiser = faiss.IndexFlatIP(emb.shape[1])
+            nlist = int(np.ceil(10 * np.sqrt(emb.shape[0])))
+            index = faiss.IndexIVFFlat(
+                quantiser, emb.shape[1], nlist, faiss.METRIC_INNER_PRODUCT
+            )
+            index.train(emb)
     else:
         raise NotImplementedError("does not support metric: {}".format(metric))
 
     if gpu_id is None:
         gpu_id = 0
 
-    try:
-        res = faiss.StandardGpuResources()
-        index = faiss.index_cpu_to_gpu(res, gpu_id, index)
-        index.add(emb.astype(np.float32))
-        neighbors, distances = index.search(target.astype(np.float32), k=k)
-    except (AttributeError, AssertionError) as e:
-        index.add(emb.astype(np.float32))
-        neighbors, distances = index.search(target.astype(np.float32), k=k)
+    if k >= 2048:  # if k is larger than that supported by GPU
+        index.add(emb)
+    else:
+        try:
+            res = faiss.StandardGpuResources()
+            index = faiss.index_cpu_to_gpu(res, gpu_id, index)
+            index.add(emb)
+        except (RuntimeError, AttributeError):
+            index.add(emb)
+    distances, neighbors = index.search(target, k=k)
 
-    nodes = (np.arange(emb.shape[0]).reshape((-1, 1)) @ np.ones((1, k))).astype(int)
+    assert distances.dtype == "float32"
+    assert neighbors.dtype == "int64"
+
+    nodes = (np.arange(target.shape[0]).reshape((-1, 1)) @ np.ones((1, k))).astype(int)
     neighbors = neighbors.astype(int)
     return nodes, neighbors, distances
 
@@ -416,9 +452,39 @@ def element_sim(emb, group_ids, A=None, k=10, metric="euclidean", gpu_id=None):
 
 def f1_score(emb, target, agg="mode", **params):
     """Measuring the prediction performance based on the K-Nearest Neighbor
-    Graph.
+    Graph. Equivalent to knn_pred_score(emb, target, target_type = "disc").
 
-    Equivalent to knn_pred_score(emb, target, target_type = "disc").
+    This function measures how well the embedding space can predict the metadata of entities using the k-nearest neighbor algorithm.
+    To this end, the following K-folds cross-validation is performed:
+    0. Split all entities into K groups.
+    1. Take one group as a test set and the other groups as a training set
+    2. Using the training set, predict the `target` variable for the entities in the training set. The prediction is made by the most frequent target variables of the nearest neighbors.
+    3. Calculate the prediction accuracy by the f1-score
+    4. Repeat Steps 1-3 such that each group is used as the test set once.
+    5. Compute the average of the prediction accuracy computed in Step 3.
+
+    :param emb: embedding vectors
+    :type emb: numpy.ndarray (num_entities, dim)
+    :param target: target variable to predict
+    :type target: numpy.ndarray (num_target,)
+    :paramm metric: Distance metric for finding nearest neighbors. Available metric `metric="euclidean"`, `metric="cosine"` , `metric="dotsim"`
+    :type metric: str
+    :paramm agg: How to aggregate the neighbors' variables. Setting `aggregation='mode'` uses the most frequent label, `='mean'` uses the mean as the predicted variable.
+    :type agg: str
+    :param k: Number of nearest neighbors, defaults to 10
+    :type k: int or list, optional
+    :param n_splits: Number of folds for the cross-validation, defaults to 10
+    :type n_splits: int, optional
+    :param iteration: Number of rounds of the cross validation. If iteration>1, the average of the cross validation score will be returned. If `return_score_all=True`, all scores will be returned, defaults to 1.
+    :type iteration: int
+    :param return_all_scores: Set `True` to return all scores for the cross-vaidations. If set `False`, the mean of the score is returned
+    :type return_all_scores: bool
+    :param gpu_id: ID of the GPU device.
+    :type gpu_id: string or int
+    :param knn_exact: Set `True` to use the exact nearest neighbors for prediction. If set `False`, hueristics are used to find "probably" the nearest neighbors for the sake of substantial computation speed up.
+    :type knn_exact: string or int
+    :return: dict object {"k", "score"}, where k is the number of neighbors, and score is the prediction score.
+    :rtype: dict
     """
     scoring_func = partial(skmetrics.f1_score, average="micro")
     _, _target = np.unique(target, return_inverse=True)
@@ -431,6 +497,15 @@ def r2_score(emb, target, model="linear", test=True, **params):
     Graph or Linear Regression.
 
     If model == "knn", this is quivalent to knn_pred_score(emb, target, target_type = "cont").
+
+    This function measures how well the embedding space can predict the metadata of entities using the k-nearest neighbor algorithm.
+    To this end, the following K-folds cross-validation is performed:
+    0. Split all entities into K groups.
+    1. Take one group as a test set and the other groups as a training set
+    2. Using the training set, predict the `target` variable for the entities in the training set. The prediction is made by the average target variables of the nearest neighbors.
+    3. Calculate the prediction accuracy by the R^2 score
+    4. Repeat Steps 1-3 such that each group is used as the test set once.
+    5. Compute the average of the prediction accuracy computed in Step 3.
 
     :param emb: embedding vectors
     :type emb: numpy.ndarray (num_entities, dim)
@@ -456,7 +531,7 @@ def linear_pred_score(
     """Measuring the prediction performance based on a linear regression model.
 
     This function measures how well the embedding space can predict the metadata of entities using the linear regression model.
-    To this end, the following K-folds cross validation is performed:
+    To this end, the following K-folds cross-validation is performed:
     0. Split all entities into K groups.
     1. Take one group as a test set and the other groups as a training set
     2. Using the training set, predict the `target` variable for the entities in the training set using a linear regression model.
@@ -482,7 +557,7 @@ def linear_pred_score(
     scores = []
     all_score = []
     for _i in range(iteration):
-        kf = KFold(n_splits=n_splits)
+        kf = KFold(n_splits=n_splits, shuffle=True)
         _scores = []
         for train_index, test_index in kf.split(target):
             x_train = emb[train_index, :]
@@ -518,6 +593,7 @@ def knn_pred_score(
     iteration=1,
     return_all_scores=False,
     gpu_id=None,
+    knn_exact=True,
 ):
     """Prediction based on k-Nearest neighbor graph.
 
@@ -538,38 +614,55 @@ def knn_pred_score(
     :type n_splits: int, optional
     :param iteration: Number of rounds of the cross validation. If iteration>1, the average of the cross validation score will be returned., defaults to 1.
     :type iteration: int
+    :param return_all_scores: Set `True` to return all scores for the cross-vaidations. If set `False`, the mean of the score is returned
+    :type return_all_scores: bool
+    :param gpu_id: ID of the GPU device.
+    :type gpu_id: string or int
+    :param knn_exact: Set `True` to use the exact nearest neighbors for prediction. If set `False`, hueristics are used to find "probably" the nearest neighbors for the sake of substantial computation speed up.
+    :type knn_exact: string or int
     :return: dict object {"k", "score"}, where k is the number of neighbors, and score is the prediction score.
     :rtype: dict
     """
 
-    kf = KFold(n_splits=n_splits, shuffle=True)
     scores = []
-    for _, (train_index, test_index) in enumerate(kf.split(target)):
+    pbar = tqdm(total=iteration * n_splits)
+    for _ in range(iteration):
+        kf = KFold(n_splits=n_splits, shuffle=True)
+        for _, (train_index, test_index) in enumerate(kf.split(target)):
+            train_emb = emb[train_index, :]
+            test_emb = emb[test_index, :]
+            train_labels = target[train_index]
+            test_labels = target[test_index]
 
-        train_emb = emb[train_index, :]
-        test_emb = emb[test_index, :]
-        train_labels = target[train_index]
-        test_labels = target[test_index]
+            pred_k = _make_knn_pred(
+                test_emb,
+                train_emb,
+                train_labels=train_labels,
+                klist=k,
+                agg=agg,
+                metric=metric,
+                gpu_id=gpu_id,
+                knn_exact=knn_exact,
+            )
 
-        pred_k = make_knn_pred(
-            test_emb,
-            train_emb,
-            train_labels=train_labels,
-            klist=k,
-            agg=agg,
-            metric=metric,
-            gpu_id=gpu_id,
-        )
-
-        for k, pred in pred_k.items():
-            score = scoring_func(test_labels, pred)
-            scores.append({"score": score, "k": k})
+            for _k, pred in pred_k.items():
+                score = scoring_func(test_labels, pred)
+                scores.append({"score": score, "k": _k})
+            pbar.update(1)
     return scores
 
 
-def make_knn_pred(
-    target, emb, train_labels, klist, agg="mode", metric="euclidean", gpu_id=None
+def _make_knn_pred(
+    target,
+    emb,
+    train_labels,
+    klist,
+    agg="mode",
+    metric="euclidean",
+    gpu_id=None,
+    knn_exact=True,
 ):
+    """Inner function for make_knn_pred_score."""
 
     if isinstance(klist, numbers.Number):
         klist = [klist]
@@ -577,7 +670,7 @@ def make_knn_pred(
     # Train
     kmax = int(np.max(klist))
     _, indices, distances = find_nearest_neighbors(
-        target, emb, k=kmax, metric=metric, gpu_id=gpu_id
+        target, emb, k=kmax, metric=metric, gpu_id=gpu_id, exact=knn_exact
     )
 
     # Agrgegation
