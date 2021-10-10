@@ -18,8 +18,8 @@ pip install emlens
 ```
 
 `emlens` uses [faiss library](https://github.com/facebookresearch/faiss), which has two versions, `faiss-cpu` and `faiss-gpu`.
-As the name stands, `faiss-gpu` can leverage GPUs, thureby faster if you have GPUs. `emlens` uses `faiss-cpu` by default to avoid unnecessary GPU-related troubles.
-Yet, you can still leverage the GPUs (which is recommended if you have) by installing `faiss-gpu` by
+As the name stands, `faiss-gpu` can leverage GPUs, thereby faster if you have GPUs. `emlens` uses `faiss-cpu` by default to avoid unnecessary GPU-related troubles.
+But, you can still leverage the GPUs (which is recommended if you have) by installing `faiss-gpu` by
 
 *with conda*:
 ```bash
@@ -30,8 +30,6 @@ or *with pip*:
 ```
 pip install faiss-gpu
 ```
-
-### Installing emlens
 
 
 ## Maintenance
